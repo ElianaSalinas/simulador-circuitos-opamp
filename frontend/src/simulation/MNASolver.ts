@@ -112,15 +112,34 @@ export function solveMNA(
     const opRow = nNodes + voltageSources.length + k;
     const [nInP, nInN, nOut] = el.nodes;
 
-    // Output current source stamp (column side)
-    if (nOut !== 0) { G[nodeIdx(nOut)][opRow] += 1; G[opRow][nodeIdx(nOut)] += 1; }
+    // ── Ideal Op-Amp stamp ────────────────────────────────────────────────
+    // The op-amp introduces an extra variable: the output current I_op.
+    //
+    // Two stamps:
+    //  1) Output current injected at nOut:
+    //     G[nOut_idx][opRow] += 1   (B column)
+    //     G[opRow][nOut_idx] += 1   (C row — placeholder, overwritten below)
+    //
+    //  2) Virtual short constraint row (replaces C row):
+    //     V_in+ - V_in- = 0
+    //     G[opRow][nInP_idx] = +1, G[opRow][nInN_idx] = -1
+    //     (nOut is NOT included in this row)
+    //
+    // This correctly models: output supplies whatever current is needed
+    // to keep V+ = V-.
 
-    // Virtual short constraint: V_in+ - V_in- = 0  (ideal op-amp)
-    // Stamp: 1 at in+, -1 at in-
-    if (nInP !== 0) G[opRow][nodeIdx(nInP)] += 1;
-    if (nInN !== 0) G[opRow][nodeIdx(nInN)] -= 1;
+    // Step 1: inject output current at the output node
+    if (nOut !== 0) {
+      G[nodeIdx(nOut)][opRow] += 1; // B column
+    }
+
+    // Step 2: constraint row — V_in+ - V_in- = 0
+    // (This row does NOT have the output node — only inputs)
+    if (nInP !== 0) G[opRow][nodeIdx(nInP)] = 1;
+    if (nInN !== 0) G[opRow][nodeIdx(nInN)] = -1;
 
     I[opRow] = 0;
+
   });
 
   // ── Solve ────────────────────────────────────────────────────────────────
