@@ -91,9 +91,14 @@ export function solveMNA(
 
   for (let iter = 0; iter < maxIters; iter++) {
     // Reset G & I for this iteration
+    const GMIN = 1e-12;
     for (let r = 0; r < size; r++) {
       for (let c = 0; c < size; c++) G[r][c] = 0;
       I[r] = 0;
+      // Añadir una conductancia mínima a tierra (GMIN) en cada nodo para evitar matriz singular por nodos flotantes
+      if (r < nNodes) {
+        G[r][r] = GMIN;
+      }
     }
 
     // ── Stamp resistors ──────────────────────────────────────────────────────
