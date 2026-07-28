@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useDispatch } from 'react-redux';
 import { loginSuccess } from '../store/authSlice';
 import { api } from '../api';
+import { showToast } from './Toast';
 
 interface AuthModalProps {
   onClose: () => void;
@@ -29,6 +30,7 @@ const AuthModal: React.FC<AuthModalProps> = ({ onClose }) => {
         data = await api.register({ email, password, name });
       }
       dispatch(loginSuccess({ token: data.token, user: data.user }));
+      showToast(isLogin ? 'Sesión iniciada' : 'Cuenta creada exitosamente', 'success');
       onClose();
     } catch (err: any) {
       setError(err.message || 'Error de autenticación');

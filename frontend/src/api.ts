@@ -8,6 +8,21 @@ const getHeaders = () => {
   };
 };
 
+const handleResponse = async (res: Response) => {
+  if (res.status === 401 || res.status === 403) {
+    // Token expired or invalid
+    localStorage.removeItem('token');
+    localStorage.removeItem('user');
+    window.dispatchEvent(new CustomEvent('auth-expired'));
+    throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+  }
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Ocurrió un error en la petición');
+  }
+  return res.json();
+};
+
 export const api = {
   // Auth
   register: async (data: any) => {
@@ -16,8 +31,7 @@ export const api = {
       headers: getHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error((await res.json()).error);
-    return res.json();
+    return handleResponse(res);
   },
   login: async (data: any) => {
     const res = await fetch(`${API_URL}/auth/login`, {
@@ -25,20 +39,17 @@ export const api = {
       headers: getHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error((await res.json()).error);
-    return res.json();
+    return handleResponse(res);
   },
 
   // Circuits
   getCircuits: async () => {
     const res = await fetch(`${API_URL}/circuits`, { headers: getHeaders() });
-    if (!res.ok) throw new Error((await res.json()).error);
-    return res.json();
+    return handleResponse(res);
   },
   getCircuit: async (id: string) => {
     const res = await fetch(`${API_URL}/circuits/${id}`, { headers: getHeaders() });
-    if (!res.ok) throw new Error((await res.json()).error);
-    return res.json();
+    return handleResponse(res);
   },
   createCircuit: async (data: { name: string; data: any }) => {
     const res = await fetch(`${API_URL}/circuits`, {
@@ -46,8 +57,7 @@ export const api = {
       headers: getHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error((await res.json()).error);
-    return res.json();
+    return handleResponse(res);
   },
   updateCircuit: async (id: string, data: { name?: string; data?: any }) => {
     const res = await fetch(`${API_URL}/circuits/${id}`, {
@@ -55,15 +65,13 @@ export const api = {
       headers: getHeaders(),
       body: JSON.stringify(data)
     });
-    if (!res.ok) throw new Error((await res.json()).error);
-    return res.json();
+    return handleResponse(res);
   },
   deleteCircuit: async (id: string) => {
     const res = await fetch(`${API_URL}/circuits/${id}`, {
       method: 'DELETE',
       headers: getHeaders()
     });
-    if (!res.ok) throw new Error((await res.json()).error);
-    return res.json();
+    return handleResponse(res);
   }
 };

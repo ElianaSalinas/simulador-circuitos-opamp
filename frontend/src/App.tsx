@@ -23,6 +23,7 @@ import CircuitManagerModal from './components/CircuitManagerModal'
 import { logout } from './store/authSlice'
 import { setCircuitMetadata, clearCircuit } from './store/circuitSlice'
 import { api } from './api'
+import Toast, { showToast } from './components/Toast'
 
 // ── Transient time presets ──────────────────────────────────────────────────
 const TIME_PRESETS = [
@@ -68,6 +69,16 @@ const App: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
+
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      dispatch(logout());
+      dispatch(clearCircuit());
+      showToast('Tu sesión ha expirado. Por favor, inicia sesión nuevamente.', 'error');
+    };
+    window.addEventListener('auth-expired', handleAuthExpired);
+    return () => window.removeEventListener('auth-expired', handleAuthExpired);
+  }, [dispatch]);
 
   // ── Auto-validate ───────────────────────────────────────────────────────
   useEffect(() => {
@@ -130,9 +141,9 @@ const App: React.FC = () => {
         const result = await api.createCircuit({ name: savedName, data: dataToSave })
         dispatch(setCircuitMetadata({ id: result.id, name: result.name }))
       }
-      alert('Circuito guardado correctamente')
+      showToast('Circuito guardado correctamente', 'success')
     } catch (err: any) {
-      alert(err.message || 'Error al guardar')
+      showToast(err.message || 'Error al guardar', 'error')
     } finally {
       setIsSaving(false)
     }
@@ -142,9 +153,10 @@ const App: React.FC = () => {
   const canSimulate = components.length > 0 && !hasErrors
 
   return (
-    <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
-
-      {/* ── Header ─────────────────────────────────────────────────────── */}
+    <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden relative font-sans">
+      <Toast />
+      
+      {/* ── Top Bar ──────────────────────────────────────────────────────── */}
       <header className="flex items-center justify-between px-5 py-2 bg-gray-900 text-white shadow-lg z-20 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center font-bold text-base">⚡</div>
