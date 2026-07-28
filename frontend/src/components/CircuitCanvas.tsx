@@ -31,7 +31,9 @@ const CircuitCanvas: React.FC = () => {
   const pendingConn = useSelector((state: RootState) => state.circuit.pendingConnection);
 
   const stageRef = useRef<Konva.Stage>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const [mousePos, setMousePos] = useState<{ x: number; y: number } | null>(null);
+  const [dimensions, setDimensions] = useState({ width: window.innerWidth - 460, height: window.innerHeight - 100 });
 
   // Handle drag-end: update position in Redux
   const handleDragEnd = (e: KonvaEventObject<DragEvent>, id: string) => {
@@ -80,7 +82,22 @@ const CircuitCanvas: React.FC = () => {
       a.click();
     };
     window.addEventListener('export-png', handleExport);
-    return () => window.removeEventListener('export-png', handleExport);
+
+    const handleResize = () => {
+      if (containerRef.current) {
+        setDimensions({
+          width: containerRef.current.offsetWidth,
+          height: containerRef.current.offsetHeight
+        });
+      }
+    };
+    window.addEventListener('resize', handleResize);
+    handleResize(); // Initial size update
+
+    return () => {
+      window.removeEventListener('export-png', handleExport);
+      window.removeEventListener('resize', handleResize);
+    };
   }, []);
 
   // Render wires (completed connections)
@@ -224,6 +241,7 @@ const CircuitCanvas: React.FC = () => {
 
   return (
     <div
+      ref={containerRef}
       className="flex-1 relative overflow-hidden bg-gray-100"
       style={{ backgroundImage: 'radial-gradient(#d1d5db 1px, transparent 1px)', backgroundSize: '24px 24px' }}
     >
@@ -236,8 +254,8 @@ const CircuitCanvas: React.FC = () => {
 
       <Stage
         ref={stageRef}
-        width={window.innerWidth - 250}
-        height={window.innerHeight - 100}
+        width={dimensions.width}
+        height={dimensions.height}
         onClick={handleStageClick}
         onMouseMove={handleMouseMove}
         style={{ cursor: pendingConn ? 'crosshair' : 'default' }}
