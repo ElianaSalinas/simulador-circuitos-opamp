@@ -114,11 +114,9 @@ export function buildNetlist(
         const nInP = getNode(comp.id, 'in+');
         const nInN = getNode(comp.id, 'in-');
         const nOut = getNode(comp.id, 'out');
-        const nVcc = getNode(comp.id, 'vcc');
-        const nVee = getNode(comp.id, 'vee');
         // Ideal Op-Amp: modeled as VCVS Vout = A*(Vin+ - Vin-)
-        // Supply rails just get numbered but are not stamped in DC ideal model
-        void nVcc; void nVee;
+        // Supply rails are not stamped in the ideal model, so we don't assign them node IDs 
+        // unless they are connected to other components that do.
         elements.push({ id: comp.id, type: 'OpAmp', nodes: [nInP, nInN, nOut], value: 1e6, label: comp.label });
         break;
       }
