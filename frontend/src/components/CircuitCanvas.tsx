@@ -47,7 +47,7 @@ const CircuitCanvas: React.FC = () => {
   };
 
   // Track mouse while dragging a wire
-  const handleMouseMove = (e: KonvaEventObject<MouseEvent>) => {
+  const handleMouseMove = () => {
     if (!pendingConn) return;
     const stage = stageRef.current;
     if (!stage) return;

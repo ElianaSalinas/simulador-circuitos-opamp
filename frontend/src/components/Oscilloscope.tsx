@@ -277,7 +277,7 @@ const Oscilloscope: React.FC = () => {
             <div key={ch} className="flex-1 flex flex-col gap-1 border-r border-gray-700 last:border-0 pr-4">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold" style={{ color }}>CH{ch}</span>
-                {lastVal !== null && (
+                {lastVal !== null && lastVal !== undefined && (
                   <span className="text-[10px] font-mono text-gray-400">{formatVoltage(lastVal)}</span>
                 )}
               </div>

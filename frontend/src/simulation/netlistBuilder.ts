@@ -89,16 +89,25 @@ export function buildNetlist(
         break;
       }
       case 'Capacitor': {
-        // In DC analysis, capacitors are open circuits (infinite impedance) → skip
-        // We still register the nodes so they get numbers
-        getNode(comp.id, 'left');
-        getNode(comp.id, 'right');
+        const n1 = getNode(comp.id, 'left');
+        const n2 = getNode(comp.id, 'right');
+        elements.push({ id: comp.id, type: 'C', nodes: [n1, n2], value: comp.value ?? 1e-6, label: comp.label });
         break;
       }
       case 'Voltage': {
         const nPos = getNode(comp.id, '+');
         const nNeg = getNode(comp.id, '-');
-        elements.push({ id: comp.id, type: 'VS', nodes: [nPos, nNeg], value: comp.value ?? 5, label: comp.label });
+        elements.push({ 
+          id: comp.id, 
+          type: 'VS', 
+          nodes: [nPos, nNeg], 
+          value: comp.value ?? 5, 
+          label: comp.label,
+          waveform: comp.waveform,
+          offset: comp.offset,
+          amplitude: comp.amplitude,
+          frequency: comp.frequency
+        });
         break;
       }
       case 'OpAmp': {

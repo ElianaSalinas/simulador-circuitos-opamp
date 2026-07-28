@@ -12,6 +12,11 @@ export interface NetlistElement {
   nodes: number[];    // [n+, n-] or [n+, n-, nout] for OpAmp
   value: number;      // Resistance in Ω, Voltage in V, etc.
   label: string;
+  // AC / Dynamic properties
+  waveform?: 'dc' | 'sine' | 'square' | 'triangle';
+  offset?: number;
+  amplitude?: number;
+  frequency?: number;
 }
 
 export interface SimulationResult {
