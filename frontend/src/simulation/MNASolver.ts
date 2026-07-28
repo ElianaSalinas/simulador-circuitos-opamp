@@ -19,7 +19,7 @@
 import type { NetlistElement, SimulationResult } from './types';
 
 // ── Gaussian Elimination with Partial Pivoting ─────────────────────────────
-function gaussianElimination(A: number[][], b: number[]): number[] | null {
+export function gaussianElimination(A: number[][], b: number[]): number[] | null {
   const n = b.length;
   const aug: number[][] = A.map((row, i) => [...row, b[i]]);
 

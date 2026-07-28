@@ -1,18 +1,31 @@
-import React, { useEffect, useCallback } from 'react'
+import React, { useEffect, useCallback, useState } from 'react'
 import { useDispatch, useSelector } from 'react-redux'
 import type { RootState } from './store'
 import {
   removeComponent, selectComponent, cancelConnection,
   setValidationErrors, clearValidationErrors,
 } from './store/circuitSlice'
-import { startSimulation, simulationSuccess, simulationError, resetSimulation } from './store/simulationSlice'
+import {
+  startSimulation, simulationSuccess, simulationError,
+  resetSimulation, transientSuccess, toggleOscilloscope,
+} from './store/simulationSlice'
 import { validateCircuit } from './store/circuitUtils'
 import { buildNetlist } from './simulation/netlistBuilder'
 import { solveMNA } from './simulation/MNASolver'
+import { solveTransient } from './simulation/TransientSolver'
 import ComponentPalette from './components/ComponentPalette'
 import CircuitCanvas from './components/CircuitCanvas'
 import PropertyPanel from './components/PropertyPanel'
 import SimulationPanel from './components/SimulationPanel'
+import Oscilloscope from './components/Oscilloscope'
+
+// ── Transient time presets ──────────────────────────────────────────────────
+const TIME_PRESETS = [
+  { label: '1 ms', tEnd: 1e-3, tStep: 1e-6 },
+  { label: '10 ms', tEnd: 10e-3, tStep: 10e-6 },
+  { label: '100 ms', tEnd: 100e-3, tStep: 100e-6 },
+  { label: '1 s', tEnd: 1, tStep: 1e-3 },
+];
 
 const App: React.FC = () => {
   const dispatch = useDispatch()
@@ -21,6 +34,11 @@ const App: React.FC = () => {
   const connections = useSelector((state: RootState) => state.circuit.connections)
   const validationErrors = useSelector((state: RootState) => state.circuit.validationErrors)
   const simStatus = useSelector((state: RootState) => state.simulation.status)
+  const oscilloscopeVisible = useSelector((state: RootState) => state.simulation.oscilloscopeVisible)
+  const waveformData = useSelector((state: RootState) => state.simulation.waveformData)
+
+  const [selectedPreset, setSelectedPreset] = useState(1) // 10ms default
+  const [activeTab, setActiveTab] = useState<'dc' | 'transient'>('dc')
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -40,25 +58,39 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [handleKeyDown])
 
-  // ── Auto-validate on circuit change ────────────────────────────────────
+  // ── Auto-validate ───────────────────────────────────────────────────────
   useEffect(() => {
     if (components.length === 0) { dispatch(clearValidationErrors()); return }
     dispatch(setValidationErrors(validateCircuit(components, connections)))
-    // Reset simulation if circuit changed
     if (simStatus === 'success') dispatch(resetSimulation())
   }, [components, connections, dispatch]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Run simulation ──────────────────────────────────────────────────────
-  const runSimulation = () => {
+  // ── DC Simulation ───────────────────────────────────────────────────────
+  const runDC = () => {
     dispatch(startSimulation())
     try {
       const { elements, nodeCount, nodeLabels } = buildNetlist(components, connections)
       const result = solveMNA(elements, nodeCount, nodeLabels)
-      if (result.success) {
-        dispatch(simulationSuccess(result))
-      } else {
-        dispatch(simulationError(result.error ?? 'Error desconocido en simulación'))
-      }
+      if (result.success) dispatch(simulationSuccess(result))
+      else dispatch(simulationError(result.error ?? 'Error en simulación DC'))
+    } catch (err: unknown) {
+      dispatch(simulationError(err instanceof Error ? err.message : 'Error inesperado'))
+    }
+  }
+
+  // ── Transient Simulation ────────────────────────────────────────────────
+  const runTransient = () => {
+    dispatch(startSimulation())
+    try {
+      const { elements, nodeCount, nodeLabels } = buildNetlist(components, connections)
+      const preset = TIME_PRESETS[selectedPreset]
+      const result = solveTransient(elements, nodeCount, nodeLabels, {
+        tStart: 0,
+        tEnd: preset.tEnd,
+        tStep: preset.tStep,
+      })
+      if (result.success && result.data) dispatch(transientSuccess(result.data))
+      else dispatch(simulationError(result.error ?? 'Error en análisis transitorio'))
     } catch (err: unknown) {
       dispatch(simulationError(err instanceof Error ? err.message : 'Error inesperado'))
     }
@@ -71,7 +103,7 @@ const App: React.FC = () => {
     <div className="flex flex-col h-screen bg-gray-50 overflow-hidden">
 
       {/* ── Header ─────────────────────────────────────────────────────── */}
-      <header className="flex items-center justify-between px-5 py-2.5 bg-gray-900 text-white shadow-lg z-20 flex-shrink-0">
+      <header className="flex items-center justify-between px-5 py-2 bg-gray-900 text-white shadow-lg z-20 flex-shrink-0">
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center font-bold text-base">⚡</div>
           <div>
@@ -79,44 +111,87 @@ const App: React.FC = () => {
             <span className="ml-3 text-xs text-gray-400">Simulador Educativo</span>
           </div>
         </div>
-        <div className="flex items-center gap-3">
+
+        <div className="flex items-center gap-2">
           {/* Validation badge */}
           {components.length > 0 && (
-            <div className={`text-xs px-3 py-1 rounded-full font-medium transition-all ${
+            <div className={`text-xs px-3 py-1 rounded-full font-medium ${
               hasErrors
                 ? 'bg-red-500/20 text-red-400 border border-red-500/30'
                 : 'bg-green-500/20 text-green-400 border border-green-500/30'
             }`}>
-              {hasErrors ? `⚠ ${validationErrors.length} error(es)` : '✓ Circuito válido'}
+              {hasErrors ? `⚠ ${validationErrors.length} error(es)` : '✓ Válido'}
             </div>
           )}
 
-          {/* Reset button */}
-          {simStatus !== 'idle' && (
+          {/* Analysis mode tabs */}
+          <div className="flex bg-gray-800 rounded-lg p-0.5 border border-gray-700">
             <button
-              onClick={() => dispatch(resetSimulation())}
-              className="px-3 py-1.5 text-xs rounded-md bg-gray-700 hover:bg-gray-600 text-gray-300 transition-colors"
+              onClick={() => setActiveTab('dc')}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                activeTab === 'dc' ? 'bg-blue-600 text-white' : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >⚡ DC</button>
+            <button
+              onClick={() => setActiveTab('transient')}
+              className={`px-3 py-1 rounded-md text-xs font-semibold transition-all ${
+                activeTab === 'transient' ? 'bg-teal-600 text-white' : 'text-gray-400 hover:text-gray-200'
+              }`}
+            >〜 Transitorio</button>
+          </div>
+
+          {/* Transient time selector */}
+          {activeTab === 'transient' && (
+            <select
+              value={selectedPreset}
+              onChange={e => setSelectedPreset(Number(e.target.value))}
+              className="text-xs bg-gray-800 text-gray-200 border border-gray-600 rounded-md px-2 py-1.5 focus:outline-none"
             >
-              ⏹ Detener
+              {TIME_PRESETS.map((p, i) => (
+                <option key={i} value={i}>{p.label}</option>
+              ))}
+            </select>
+          )}
+
+          {/* Oscilloscope toggle (visible when waveform available) */}
+          {waveformData && (
+            <button
+              onClick={() => dispatch(toggleOscilloscope())}
+              className={`px-3 py-1.5 text-xs rounded-md font-semibold border transition-all ${
+                oscilloscopeVisible
+                  ? 'bg-teal-600/30 text-teal-300 border-teal-600/50'
+                  : 'bg-gray-700 text-gray-400 border-gray-600 hover:border-gray-500'
+              }`}
+            >
+              ⊡ Osciloscopio
             </button>
           )}
 
-          {/* Simulate button */}
+          {/* Reset */}
+          {simStatus !== 'idle' && (
+            <button
+              onClick={() => dispatch(resetSimulation())}
+              className="px-3 py-1.5 text-xs rounded-md bg-gray-700 hover:bg-gray-600 text-gray-300 border border-gray-600"
+            >
+              ⏹ Reset
+            </button>
+          )}
+
+          {/* Run button */}
           <button
-            onClick={runSimulation}
+            onClick={activeTab === 'dc' ? runDC : runTransient}
             disabled={!canSimulate || simStatus === 'running'}
-            className={`
-              flex items-center gap-2 px-4 py-1.5 rounded-md text-sm font-semibold transition-all shadow-md
-              ${canSimulate && simStatus !== 'running'
-                ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                : 'bg-gray-700 text-gray-500 cursor-not-allowed'}
-            `}
+            className={`flex items-center gap-1.5 px-4 py-1.5 rounded-md text-sm font-semibold transition-all shadow-md ${
+              canSimulate && simStatus !== 'running'
+                ? activeTab === 'dc'
+                  ? 'bg-blue-600 hover:bg-blue-500 text-white'
+                  : 'bg-teal-600 hover:bg-teal-500 text-white'
+                : 'bg-gray-700 text-gray-500 cursor-not-allowed'
+            }`}
           >
-            {simStatus === 'running' ? (
-              <><span className="animate-spin inline-block">⟳</span> Simulando...</>
-            ) : (
-              <>▶ Simular DC</>
-            )}
+            {simStatus === 'running'
+              ? <><span className="animate-spin inline-block">⟳</span> Simulando...</>
+              : activeTab === 'dc' ? '▶ Simular DC' : '▶ Simular Transitorio'}
           </button>
         </div>
       </header>
@@ -126,18 +201,22 @@ const App: React.FC = () => {
         <ComponentPalette />
         <div className="relative flex-1">
           <CircuitCanvas />
-          <SimulationPanel />
+          {/* DC results panel */}
+          {activeTab === 'dc' && <SimulationPanel />}
+          {/* Oscilloscope */}
+          <Oscilloscope />
         </div>
         <PropertyPanel />
       </div>
 
       {/* ── Status bar ──────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-4 px-5 py-1.5 bg-gray-800 text-gray-400 text-xs flex-shrink-0">
+      <div className="flex items-center gap-3 px-5 py-1.5 bg-gray-800 text-gray-400 text-xs flex-shrink-0">
         <span>{components.length} componente(s)</span>
         <span>·</span>
         <span>{connections.length} conexión(es)</span>
         <span>·</span>
-        {simStatus === 'success' && <span className="text-green-400">✓ Simulación DC completada</span>}
+        {simStatus === 'success' && !waveformData && <span className="text-green-400">✓ DC completado</span>}
+        {simStatus === 'success' && waveformData && <span className="text-teal-400">✓ Transitorio completado — {waveformData.timePoints.length} puntos</span>}
         {simStatus === 'error' && <span className="text-red-400">✗ Error en simulación</span>}
         {simStatus === 'idle' && (
           <span>
