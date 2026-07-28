@@ -5,25 +5,22 @@ export const predefinedCircuits = [
     data: {
       components: [
         { id: 'op1', type: 'OpAmp', x: 400, y: 300, rotation: 0, label: 'U1' },
-        { id: 'r1', type: 'Resistor', x: 400, y: 400, rotation: 0, value: 10000, label: 'R1 (10k)' },
-        { id: 'r2', type: 'Resistor', x: 250, y: 400, rotation: 90, value: 10000, label: 'R2 (10k)' },
-        { id: 'r3', type: 'Resistor', x: 400, y: 200, rotation: 0, value: 10000, label: 'R3 (10k)' },
-        { id: 'c1', type: 'Capacitor', x: 250, y: 200, rotation: 90, value: 1e-7, label: 'C1 (100nF)' },
-        { id: 'gnd', type: 'Ground', x: 250, y: 500, rotation: 0, label: 'GND' },
-        { id: 'osc', type: 'Oscilloscope', x: 600, y: 300, rotation: 0, label: 'Osciloscopio' }
+        { id: 'r1', type: 'Resistor', x: 400, y: 400, rotation: 0, value: 10000, label: 'R1' },
+        { id: 'r2', type: 'Resistor', x: 250, y: 400, rotation: 90, value: 10000, label: 'R2' },
+        { id: 'r3', type: 'Resistor', x: 400, y: 200, rotation: 0, value: 10000, label: 'R3' },
+        { id: 'c1', type: 'Capacitor', x: 250, y: 200, rotation: 90, value: 1e-7, label: 'C1' },
+        { id: 'gnd', type: 'Ground', x: 250, y: 500, rotation: 0, label: 'GND1' }
       ],
       connections: [
-        { id: 'c_r1_out', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'r1', toTerminal: 'right' },
-        { id: 'c_r1_p', fromComponent: 'r1', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inP' },
-        { id: 'c_r2_p', fromComponent: 'r2', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inP' },
-        { id: 'c_r2_gnd', fromComponent: 'r2', fromTerminal: 'right', toComponent: 'gnd', toTerminal: 'top' },
+        { id: 'c1', fromComponentId: 'op1', fromPinId: 'out', toComponentId: 'r1', toPinId: 'right' },
+        { id: 'c2', fromComponentId: 'r1', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in+' },
+        { id: 'c3', fromComponentId: 'r2', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in+' },
+        { id: 'c4', fromComponentId: 'r2', fromPinId: 'right', toComponentId: 'gnd', toPinId: 'gnd' },
         
-        { id: 'c_r3_out', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'r3', toTerminal: 'right' },
-        { id: 'c_r3_n', fromComponent: 'r3', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inN' },
-        { id: 'c_c1_n', fromComponent: 'c1', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inN' },
-        { id: 'c_c1_gnd', fromComponent: 'c1', fromTerminal: 'right', toComponent: 'gnd', toTerminal: 'top' },
-
-        { id: 'c_osc', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'osc', toTerminal: 'ch1' }
+        { id: 'c5', fromComponentId: 'op1', fromPinId: 'out', toComponentId: 'r3', toPinId: 'right' },
+        { id: 'c6', fromComponentId: 'r3', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in-' },
+        { id: 'c7', fromComponentId: 'c1', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in-' },
+        { id: 'c8', fromComponentId: 'c1', fromPinId: 'right', toComponentId: 'gnd', toPinId: 'gnd' }
       ]
     }
   },
@@ -33,33 +30,30 @@ export const predefinedCircuits = [
     data: {
       components: [
         { id: 'op1', type: 'OpAmp', x: 500, y: 300, rotation: 0, label: 'U1' },
-        { id: 'r1', type: 'Resistor', x: 300, y: 200, rotation: 0, value: 10000, label: 'R (10k)' },
-        { id: 'c1', type: 'Capacitor', x: 400, y: 200, rotation: 0, value: 1e-7, label: 'C (100nF)' },
-        { id: 'r2', type: 'Resistor', x: 200, y: 300, rotation: 90, value: 10000, label: 'R (10k)' },
-        { id: 'c2', type: 'Capacitor', x: 200, y: 400, rotation: 90, value: 1e-7, label: 'C (100nF)' },
+        { id: 'r1', type: 'Resistor', x: 300, y: 200, rotation: 0, value: 10000, label: 'R1' },
+        { id: 'c1', type: 'Capacitor', x: 400, y: 200, rotation: 0, value: 1e-7, label: 'C1' },
+        { id: 'r2', type: 'Resistor', x: 200, y: 300, rotation: 90, value: 10000, label: 'R2' },
+        { id: 'c2', type: 'Capacitor', x: 200, y: 400, rotation: 90, value: 1e-7, label: 'C2' },
         
-        { id: 'r3', type: 'Resistor', x: 500, y: 450, rotation: 0, value: 21000, label: 'Rf (21k)' },
-        { id: 'r4', type: 'Resistor', x: 350, y: 450, rotation: 90, value: 10000, label: 'Ri (10k)' },
+        { id: 'r3', type: 'Resistor', x: 500, y: 450, rotation: 0, value: 21000, label: 'Rf' },
+        { id: 'r4', type: 'Resistor', x: 350, y: 450, rotation: 90, value: 10000, label: 'Ri' },
         
-        { id: 'gnd', type: 'Ground', x: 200, y: 550, rotation: 0, label: 'GND' },
-        { id: 'osc', type: 'Oscilloscope', x: 700, y: 300, rotation: 0, label: 'Osciloscopio' }
+        { id: 'gnd', type: 'Ground', x: 200, y: 550, rotation: 0, label: 'GND1' }
       ],
       connections: [
         // Positive feedback (Wien network)
-        { id: 'cw1', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'c1', toTerminal: 'right' },
-        { id: 'cw2', fromComponent: 'c1', fromTerminal: 'left', toComponent: 'r1', toTerminal: 'right' },
-        { id: 'cw3', fromComponent: 'r1', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inP' },
-        { id: 'cw4', fromComponent: 'r2', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inP' },
-        { id: 'cw5', fromComponent: 'r2', fromTerminal: 'right', toComponent: 'c2', toTerminal: 'left' },
-        { id: 'cw6', fromComponent: 'c2', fromTerminal: 'right', toComponent: 'gnd', toTerminal: 'top' },
+        { id: 'cw1', fromComponentId: 'op1', fromPinId: 'out', toComponentId: 'c1', toPinId: 'right' },
+        { id: 'cw2', fromComponentId: 'c1', fromPinId: 'left', toComponentId: 'r1', toPinId: 'right' },
+        { id: 'cw3', fromComponentId: 'r1', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in+' },
+        { id: 'cw4', fromComponentId: 'r2', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in+' },
+        { id: 'cw5', fromComponentId: 'r2', fromPinId: 'right', toComponentId: 'c2', toPinId: 'left' },
+        { id: 'cw6', fromComponentId: 'c2', fromPinId: 'right', toComponentId: 'gnd', toPinId: 'gnd' },
         
         // Negative feedback (Gain > 3 for oscillation)
-        { id: 'cn1', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'r3', toTerminal: 'right' },
-        { id: 'cn2', fromComponent: 'r3', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inN' },
-        { id: 'cn3', fromComponent: 'r4', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inN' },
-        { id: 'cn4', fromComponent: 'r4', fromTerminal: 'right', toComponent: 'gnd', toTerminal: 'top' },
-
-        { id: 'c_osc', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'osc', toTerminal: 'ch1' }
+        { id: 'cn1', fromComponentId: 'op1', fromPinId: 'out', toComponentId: 'r3', toPinId: 'right' },
+        { id: 'cn2', fromComponentId: 'r3', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in-' },
+        { id: 'cn3', fromComponentId: 'r4', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in-' },
+        { id: 'cn4', fromComponentId: 'r4', fromPinId: 'right', toComponentId: 'gnd', toPinId: 'gnd' }
       ]
     }
   },
@@ -68,59 +62,53 @@ export const predefinedCircuits = [
     name: 'Amplificador de Instrumentación (3 Op-Amps)',
     data: {
       components: [
-        { id: 'v1', type: 'VoltageSource', x: 100, y: 200, rotation: 0, value: 1, label: 'V1 (1V)', properties: { waveform: 'dc' } },
-        { id: 'v2', type: 'VoltageSource', x: 100, y: 400, rotation: 0, value: 1.1, label: 'V2 (1.1V)', properties: { waveform: 'dc' } },
-        { id: 'gnd1', type: 'Ground', x: 100, y: 500, rotation: 0, label: 'GND' },
+        { id: 'v1', type: 'Voltage', x: 100, y: 200, rotation: 0, value: 1, label: 'V1', waveform: 'dc' },
+        { id: 'v2', type: 'Voltage', x: 100, y: 400, rotation: 0, value: 1.1, label: 'V2', waveform: 'dc' },
+        { id: 'gnd1', type: 'Ground', x: 100, y: 500, rotation: 0, label: 'GND1' },
         
         { id: 'op1', type: 'OpAmp', x: 300, y: 200, rotation: 0, label: 'U1' },
         { id: 'op2', type: 'OpAmp', x: 300, y: 400, rotation: 0, label: 'U2' },
         
-        { id: 'rg', type: 'Resistor', x: 300, y: 300, rotation: 90, value: 2000, label: 'Rg (2k)' },
-        { id: 'r1', type: 'Resistor', x: 450, y: 150, rotation: 0, value: 10000, label: 'R1 (10k)' },
-        { id: 'r2', type: 'Resistor', x: 450, y: 450, rotation: 0, value: 10000, label: 'R2 (10k)' },
+        { id: 'rg', type: 'Resistor', x: 300, y: 300, rotation: 90, value: 2000, label: 'Rg' },
+        { id: 'r1', type: 'Resistor', x: 450, y: 150, rotation: 0, value: 10000, label: 'R1' },
+        { id: 'r2', type: 'Resistor', x: 450, y: 450, rotation: 0, value: 10000, label: 'R2' },
         
         { id: 'op3', type: 'OpAmp', x: 700, y: 300, rotation: 0, label: 'U3' },
-        { id: 'r3', type: 'Resistor', x: 550, y: 200, rotation: 0, value: 10000, label: 'R3 (10k)' },
-        { id: 'r4', type: 'Resistor', x: 550, y: 400, rotation: 0, value: 10000, label: 'R4 (10k)' },
-        { id: 'r5', type: 'Resistor', x: 700, y: 200, rotation: 0, value: 10000, label: 'Rf (10k)' },
-        { id: 'r6', type: 'Resistor', x: 700, y: 400, rotation: 90, value: 10000, label: 'Rgnd (10k)' },
-        { id: 'gnd2', type: 'Ground', x: 700, y: 500, rotation: 0, label: 'GND' },
-        
-        { id: 'mm', type: 'Multimeter', x: 850, y: 300, rotation: 0, label: 'Vout' }
+        { id: 'r3', type: 'Resistor', x: 550, y: 200, rotation: 0, value: 10000, label: 'R3' },
+        { id: 'r4', type: 'Resistor', x: 550, y: 400, rotation: 0, value: 10000, label: 'R4' },
+        { id: 'r5', type: 'Resistor', x: 700, y: 200, rotation: 0, value: 10000, label: 'Rf' },
+        { id: 'r6', type: 'Resistor', x: 700, y: 400, rotation: 90, value: 10000, label: 'Rgnd' },
+        { id: 'gnd2', type: 'Ground', x: 700, y: 500, rotation: 0, label: 'GND2' }
       ],
       connections: [
         // Entradas
-        { id: 'c1', fromComponent: 'v1', fromTerminal: 'pos', toComponent: 'op1', toTerminal: 'inP' },
-        { id: 'c2', fromComponent: 'v2', fromTerminal: 'pos', toComponent: 'op2', toTerminal: 'inP' },
-        { id: 'c3', fromComponent: 'v1', fromTerminal: 'neg', toComponent: 'gnd1', toTerminal: 'top' },
-        { id: 'c4', fromComponent: 'v2', fromTerminal: 'neg', toComponent: 'gnd1', toTerminal: 'top' },
+        { id: 'c1', fromComponentId: 'v1', fromPinId: '+', toComponentId: 'op1', toPinId: 'in+' },
+        { id: 'c2', fromComponentId: 'v2', fromPinId: '+', toComponentId: 'op2', toPinId: 'in+' },
+        { id: 'c3', fromComponentId: 'v1', fromPinId: '-', toComponentId: 'gnd1', toPinId: 'gnd' },
+        { id: 'c4', fromComponentId: 'v2', fromPinId: '-', toComponentId: 'gnd1', toPinId: 'gnd' },
         
         // Primera etapa (Buffers + Gain)
-        { id: 'c5', fromComponent: 'rg', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inN' },
-        { id: 'c6', fromComponent: 'rg', fromTerminal: 'right', toComponent: 'op2', toTerminal: 'inN' },
+        { id: 'c5', fromComponentId: 'rg', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in-' },
+        { id: 'c6', fromComponentId: 'rg', fromPinId: 'right', toComponentId: 'op2', toPinId: 'in-' },
         
-        { id: 'c7', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'r1', toTerminal: 'right' },
-        { id: 'c8', fromComponent: 'r1', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inN' },
+        { id: 'c7', fromComponentId: 'op1', fromPinId: 'out', toComponentId: 'r1', toPinId: 'right' },
+        { id: 'c8', fromComponentId: 'r1', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in-' },
         
-        { id: 'c9', fromComponent: 'op2', fromTerminal: 'out', toComponent: 'r2', toTerminal: 'right' },
-        { id: 'c10', fromComponent: 'r2', fromTerminal: 'left', toComponent: 'op2', toTerminal: 'inN' },
+        { id: 'c9', fromComponentId: 'op2', fromPinId: 'out', toComponentId: 'r2', toPinId: 'right' },
+        { id: 'c10', fromComponentId: 'r2', fromPinId: 'left', toComponentId: 'op2', toPinId: 'in-' },
         
         // Segunda etapa (Diferencial)
-        { id: 'c11', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'r3', toTerminal: 'left' },
-        { id: 'c12', fromComponent: 'r3', fromTerminal: 'right', toComponent: 'op3', toTerminal: 'inN' },
+        { id: 'c11', fromComponentId: 'op1', fromPinId: 'out', toComponentId: 'r3', toPinId: 'left' },
+        { id: 'c12', fromComponentId: 'r3', fromPinId: 'right', toComponentId: 'op3', toPinId: 'in-' },
         
-        { id: 'c13', fromComponent: 'op2', fromTerminal: 'out', toComponent: 'r4', toTerminal: 'left' },
-        { id: 'c14', fromComponent: 'r4', fromTerminal: 'right', toComponent: 'op3', toTerminal: 'inP' },
+        { id: 'c13', fromComponentId: 'op2', fromPinId: 'out', toComponentId: 'r4', toPinId: 'left' },
+        { id: 'c14', fromComponentId: 'r4', fromPinId: 'right', toComponentId: 'op3', toPinId: 'in+' },
         
-        { id: 'c15', fromComponent: 'op3', fromTerminal: 'out', toComponent: 'r5', toTerminal: 'right' },
-        { id: 'c16', fromComponent: 'r5', fromTerminal: 'left', toComponent: 'op3', toTerminal: 'inN' },
+        { id: 'c15', fromComponentId: 'op3', fromPinId: 'out', toComponentId: 'r5', toPinId: 'right' },
+        { id: 'c16', fromComponentId: 'r5', fromPinId: 'left', toComponentId: 'op3', toPinId: 'in-' },
         
-        { id: 'c17', fromComponent: 'r6', fromTerminal: 'left', toComponent: 'op3', toTerminal: 'inP' },
-        { id: 'c18', fromComponent: 'r6', fromTerminal: 'right', toComponent: 'gnd2', toTerminal: 'top' },
-        
-        // Multímetro
-        { id: 'c19', fromComponent: 'op3', fromTerminal: 'out', toComponent: 'mm', toTerminal: 'pos' },
-        { id: 'c20', fromComponent: 'mm', fromTerminal: 'neg', toComponent: 'gnd2', toTerminal: 'top' }
+        { id: 'c17', fromComponentId: 'r6', fromPinId: 'left', toComponentId: 'op3', toPinId: 'in+' },
+        { id: 'c18', fromComponentId: 'r6', fromPinId: 'right', toComponentId: 'gnd2', toPinId: 'gnd' }
       ]
     }
   },
@@ -130,29 +118,25 @@ export const predefinedCircuits = [
     data: {
       components: [
         { id: 'op1', type: 'OpAmp', x: 500, y: 300, rotation: 0, label: 'U1' },
-        { id: 'v1', type: 'VoltageSource', x: 200, y: 300, rotation: 0, value: 5, label: 'Vin', properties: { waveform: 'square', frequency: 100, amplitude: 5 } },
-        { id: 'r1', type: 'Resistor', x: 350, y: 250, rotation: 0, value: 10000, label: 'Rin (10k)' },
-        { id: 'c1', type: 'Capacitor', x: 450, y: 150, rotation: 0, value: 1e-6, label: 'Cf (1uF)' },
-        { id: 'r2', type: 'Resistor', x: 450, y: 100, rotation: 0, value: 100000, label: 'Rf (100k)' },
-        { id: 'gnd1', type: 'Ground', x: 200, y: 400, rotation: 0, label: 'GND' },
-        { id: 'gnd2', type: 'Ground', x: 450, y: 400, rotation: 0, label: 'GND' },
-        { id: 'osc', type: 'Oscilloscope', x: 700, y: 300, rotation: 0, label: 'Osciloscopio' }
+        { id: 'v1', type: 'Voltage', x: 200, y: 300, rotation: 0, value: 5, label: 'Vin', waveform: 'square', frequency: 100, amplitude: 5 },
+        { id: 'r1', type: 'Resistor', x: 350, y: 250, rotation: 0, value: 10000, label: 'Rin' },
+        { id: 'c1', type: 'Capacitor', x: 450, y: 150, rotation: 0, value: 1e-6, label: 'Cf' },
+        { id: 'r2', type: 'Resistor', x: 450, y: 100, rotation: 0, value: 100000, label: 'Rf' },
+        { id: 'gnd1', type: 'Ground', x: 200, y: 400, rotation: 0, label: 'GND1' },
+        { id: 'gnd2', type: 'Ground', x: 450, y: 400, rotation: 0, label: 'GND2' }
       ],
       connections: [
-        { id: 'c1', fromComponent: 'v1', fromTerminal: 'pos', toComponent: 'r1', toTerminal: 'left' },
-        { id: 'c2', fromComponent: 'r1', fromTerminal: 'right', toComponent: 'op1', toTerminal: 'inN' },
+        { id: 'c1', fromComponentId: 'v1', fromPinId: '+', toComponentId: 'r1', toPinId: 'left' },
+        { id: 'c2', fromComponentId: 'r1', fromPinId: 'right', toComponentId: 'op1', toPinId: 'in-' },
         
-        { id: 'c3', fromComponent: 'v1', fromTerminal: 'neg', toComponent: 'gnd1', toTerminal: 'top' },
-        { id: 'c4', fromComponent: 'gnd2', fromTerminal: 'top', toComponent: 'op1', toTerminal: 'inP' },
+        { id: 'c3', fromComponentId: 'v1', fromPinId: '-', toComponentId: 'gnd1', toPinId: 'gnd' },
+        { id: 'c4', fromComponentId: 'gnd2', fromPinId: 'gnd', toComponentId: 'op1', toPinId: 'in+' },
         
-        { id: 'c5', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'c1', toTerminal: 'right' },
-        { id: 'c6', fromComponent: 'c1', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inN' },
+        { id: 'c5', fromComponentId: 'op1', fromPinId: 'out', toComponentId: 'c1', toPinId: 'right' },
+        { id: 'c6', fromComponentId: 'c1', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in-' },
         
-        { id: 'c7', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'r2', toTerminal: 'right' },
-        { id: 'c8', fromComponent: 'r2', fromTerminal: 'left', toComponent: 'op1', toTerminal: 'inN' },
-        
-        { id: 'c9', fromComponent: 'op1', fromTerminal: 'out', toComponent: 'osc', toTerminal: 'ch1' },
-        { id: 'c10', fromComponent: 'v1', fromTerminal: 'pos', toComponent: 'osc', toTerminal: 'ch2' }
+        { id: 'c7', fromComponentId: 'op1', fromPinId: 'out', toComponentId: 'r2', toPinId: 'right' },
+        { id: 'c8', fromComponentId: 'r2', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in-' }
       ]
     }
   }
