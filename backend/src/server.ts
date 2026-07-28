@@ -1,14 +1,25 @@
-import express, { Request, Response } from 'express';
+import express from 'express';
+import cors from 'cors';
+import authRoutes from './routes/auth';
+import circuitRoutes from './routes/circuits';
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
-app.use(express.json());
+// Middleware
+app.use(cors());
+app.use(express.json({ limit: '10mb' })); // Aumentar límite para circuitos grandes
 
-app.get('/api/health', (req: Request, res: Response) => {
-    res.json({ status: 'ok', message: 'CircuitSim Op-Amp Backend running.' });
+// Routes
+app.use('/api/auth', authRoutes);
+app.use('/api/circuits', circuitRoutes);
+
+// Health check
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', message: 'Backend simulador op-amp funcionando.' });
 });
 
+// Start server
 app.listen(PORT, () => {
-    console.log(`Server is running on http://localhost:${PORT}`);
+  console.log(`Backend server is running on http://localhost:${PORT}`);
 });

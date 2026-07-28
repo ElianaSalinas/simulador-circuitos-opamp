@@ -18,6 +18,11 @@ import CircuitCanvas from './components/CircuitCanvas'
 import PropertyPanel from './components/PropertyPanel'
 import SimulationPanel from './components/SimulationPanel'
 import Oscilloscope from './components/Oscilloscope'
+import AuthModal from './components/AuthModal'
+import CircuitManagerModal from './components/CircuitManagerModal'
+import { logout } from './store/authSlice'
+import { setCircuitMetadata, clearCircuit } from './store/circuitSlice'
+import { api } from './api'
 
 // ── Transient time presets ──────────────────────────────────────────────────
 const TIME_PRESETS = [
@@ -36,9 +41,15 @@ const App: React.FC = () => {
   const simStatus = useSelector((state: RootState) => state.simulation.status)
   const oscilloscopeVisible = useSelector((state: RootState) => state.simulation.oscilloscopeVisible)
   const waveformData = useSelector((state: RootState) => state.simulation.waveformData)
+  const auth = useSelector((state: RootState) => state.auth)
+  const circuitId = useSelector((state: RootState) => state.circuit.circuitId)
+  const circuitName = useSelector((state: RootState) => state.circuit.circuitName)
 
   const [selectedPreset, setSelectedPreset] = useState(1) // 10ms default
   const [activeTab, setActiveTab] = useState<'dc' | 'transient'>('dc')
+  const [showAuthModal, setShowAuthModal] = useState(false)
+  const [showCircuitManager, setShowCircuitManager] = useState(false)
+  const [isSaving, setIsSaving] = useState(false)
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────
   const handleKeyDown = useCallback((e: KeyboardEvent) => {
@@ -96,6 +107,37 @@ const App: React.FC = () => {
     }
   }
 
+  // ── Save Circuit ────────────────────────────────────────────────────────
+  const handleSave = async () => {
+    if (!auth.token) {
+      setShowAuthModal(true)
+      return
+    }
+    setIsSaving(true)
+    try {
+      const dataToSave = { components, connections }
+      let savedName = circuitName;
+      if (circuitName === 'Circuito sin título') {
+        const inputName = prompt('Nombre del circuito:', 'Mi Circuito')
+        if (!inputName) { setIsSaving(false); return; }
+        savedName = inputName;
+      }
+
+      if (circuitId) {
+        await api.updateCircuit(circuitId, { name: savedName, data: dataToSave })
+        dispatch(setCircuitMetadata({ id: circuitId, name: savedName }))
+      } else {
+        const result = await api.createCircuit({ name: savedName, data: dataToSave })
+        dispatch(setCircuitMetadata({ id: result.id, name: result.name }))
+      }
+      alert('Circuito guardado correctamente')
+    } catch (err: any) {
+      alert(err.message || 'Error al guardar')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
   const hasErrors = validationErrors.length > 0
   const canSimulate = components.length > 0 && !hasErrors
 
@@ -113,6 +155,28 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Auth & Persistence */}
+          {auth.user ? (
+            <div className="flex items-center gap-2 mr-4 border-r border-gray-700 pr-4">
+              <span className="text-xs text-gray-400 font-semibold">Hola, {auth.user.name}</span>
+              <button onClick={() => setShowCircuitManager(true)} className="px-3 py-1.5 text-xs rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 transition-colors">
+                Mis Circuitos
+              </button>
+              <button onClick={handleSave} disabled={isSaving} className="px-3 py-1.5 text-xs rounded-md bg-blue-600/80 hover:bg-blue-600 text-white transition-colors">
+                {isSaving ? 'Guardando...' : (circuitId ? 'Guardar Cambios' : 'Guardar Nuevo')}
+              </button>
+              <button onClick={() => { dispatch(logout()); dispatch(clearCircuit()); }} className="text-xs text-red-400 hover:text-red-300 underline ml-2">
+                Salir
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center mr-4 border-r border-gray-700 pr-4">
+              <button onClick={() => setShowAuthModal(true)} className="px-3 py-1.5 text-xs font-semibold rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors">
+                Iniciar Sesión para Guardar
+              </button>
+            </div>
+          )}
+
           {/* Validation badge */}
           {components.length > 0 && (
             <div className={`text-xs px-3 py-1 rounded-full font-medium ${
@@ -210,21 +274,30 @@ const App: React.FC = () => {
       </div>
 
       {/* ── Status bar ──────────────────────────────────────────────────── */}
-      <div className="flex items-center gap-3 px-5 py-1.5 bg-gray-800 text-gray-400 text-xs flex-shrink-0">
-        <span>{components.length} componente(s)</span>
-        <span>·</span>
-        <span>{connections.length} conexión(es)</span>
-        <span>·</span>
-        {simStatus === 'success' && !waveformData && <span className="text-green-400">✓ DC completado</span>}
-        {simStatus === 'success' && waveformData && <span className="text-teal-400">✓ Transitorio completado — {waveformData.timePoints.length} puntos</span>}
-        {simStatus === 'error' && <span className="text-red-400">✗ Error en simulación</span>}
+      <div className="flex items-center justify-between px-5 py-1.5 bg-gray-800 text-gray-400 text-xs flex-shrink-0">
+        <div className="flex items-center gap-3">
+          <span>{circuitName} {circuitId ? '(Guardado)' : '(No guardado)'}</span>
+          <span>·</span>
+          <span>{components.length} componente(s)</span>
+          <span>·</span>
+          <span>{connections.length} conexión(es)</span>
+          <span>·</span>
+          {simStatus === 'success' && !waveformData && <span className="text-green-400">✓ DC completado</span>}
+          {simStatus === 'success' && waveformData && <span className="text-teal-400">✓ Transitorio completado — {waveformData.timePoints.length} puntos</span>}
+          {simStatus === 'error' && <span className="text-red-400">✗ Error en simulación</span>}
+        </div>
+        
         {simStatus === 'idle' && (
-          <span>
+          <div>
             <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-300 font-mono">Delete</kbd> eliminar ·{' '}
             <kbd className="px-1.5 py-0.5 bg-gray-700 rounded text-gray-300 font-mono">Esc</kbd> cancelar
-          </span>
+          </div>
         )}
       </div>
+
+      {/* Modals */}
+      {showAuthModal && <AuthModal onClose={() => setShowAuthModal(false)} />}
+      {showCircuitManager && <CircuitManagerModal onClose={() => setShowCircuitManager(false)} />}
     </div>
   )
 }

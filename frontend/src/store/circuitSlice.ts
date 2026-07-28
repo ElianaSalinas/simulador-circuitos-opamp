@@ -20,6 +20,12 @@ export interface CircuitComponent {
   value?: number;     // e.g. 1000 for 1kΩ
   unit?: string;      // e.g. "Ω", "F", "V"
   hasError?: boolean; // visual validation flag
+  // AC waveform properties (for Voltage sources)
+  waveform?: 'dc' | 'sine' | 'square' | 'triangle';
+  frequency?: number; // Hz
+  amplitude?: number; // V peak
+  offset?: number;    // V DC offset
+  phase?: number;     // degrees
 }
 
 export interface Connection {
@@ -72,11 +78,19 @@ const getNextLabel = (type: ComponentType): string => {
   return `${p}${counters[p]}`;
 };
 
-const getDefaultValue = (type: ComponentType): { value?: number; unit?: string } => {
+const getDefaultValue = (type: ComponentType): Partial<CircuitComponent> => {
   switch (type) {
     case 'Resistor': return { value: 1000, unit: 'Ω' };
     case 'Capacitor': return { value: 100e-9, unit: 'F' };
-    case 'Voltage': return { value: 5, unit: 'V' };
+    case 'Voltage': return { 
+      value: 5, 
+      unit: 'V', 
+      waveform: 'dc', 
+      frequency: 1000, 
+      amplitude: 5, 
+      offset: 0, 
+      phase: 0 
+    };
     default: return {};
   }
 };
@@ -88,6 +102,10 @@ interface CircuitState {
   selectedComponentId: string | null;
   pendingConnection: { componentId: string; pinId: string } | null;
   validationErrors: ValidationError[];
+  
+  // Persistence Metadata
+  circuitId: string | null;
+  circuitName: string;
 }
 
 const initialState: CircuitState = {
@@ -96,6 +114,8 @@ const initialState: CircuitState = {
   selectedComponentId: null,
   pendingConnection: null,
   validationErrors: [],
+  circuitId: null,
+  circuitName: 'Circuito sin título',
 };
 
 // --- Slice ---
@@ -105,27 +125,25 @@ export const circuitSlice = createSlice({
   reducers: {
     addComponent: (state, action: PayloadAction<{ type: ComponentType; x: number; y: number }>) => {
       const { type, x, y } = action.payload;
-      const { value, unit } = getDefaultValue(type);
+      const defaults = getDefaultValue(type);
       state.components.push({
         id: `${type}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         type,
         x,
         y,
         label: getNextLabel(type),
-        value,
-        unit,
         hasError: false,
+        ...defaults,
       });
     },
     updateComponentPosition: (state, action: PayloadAction<{ id: string; x: number; y: number }>) => {
       const comp = state.components.find(c => c.id === action.payload.id);
       if (comp) { comp.x = action.payload.x; comp.y = action.payload.y; }
     },
-    updateComponentValue: (state, action: PayloadAction<{ id: string; value: number; label?: string }>) => {
+    updateComponentProps: (state, action: PayloadAction<{ id: string; updates: Partial<CircuitComponent> }>) => {
       const comp = state.components.find(c => c.id === action.payload.id);
       if (comp) {
-        comp.value = action.payload.value;
-        if (action.payload.label) comp.label = action.payload.label;
+        Object.assign(comp, action.payload.updates);
       }
     },
     removeComponent: (state, action: PayloadAction<string>) => {
@@ -180,14 +198,40 @@ export const circuitSlice = createSlice({
       state.validationErrors = [];
       state.components.forEach(c => { c.hasError = false; });
     },
+    setCircuitMetadata: (state, action: PayloadAction<{ id: string; name: string }>) => {
+      state.circuitId = action.payload.id;
+      state.circuitName = action.payload.name;
+    },
+    loadCircuitData: (state, action: PayloadAction<{ components: CircuitComponent[], connections: Connection[] }>) => {
+      state.components = action.payload.components;
+      state.connections = action.payload.connections;
+      state.selectedComponentId = null;
+      state.validationErrors = [];
+    },
+    clearCircuit: (state) => {
+      state.components = [];
+      state.connections = [];
+      state.selectedComponentId = null;
+      state.validationErrors = [];
+      state.circuitId = null;
+      state.circuitName = 'Circuito sin título';
+    }
   },
 });
 
 export const {
-  addComponent, updateComponentPosition, updateComponentValue,
-  removeComponent, selectComponent,
-  startConnection, completeConnection, cancelConnection, removeConnection,
-  setValidationErrors, clearValidationErrors,
+  addComponent, updateComponentPosition, updateComponentProps,
+  removeComponent,
+  selectComponent,
+  startConnection,
+  completeConnection,
+  cancelConnection,
+  removeConnection,
+  setValidationErrors,
+  clearValidationErrors,
+  setCircuitMetadata,
+  loadCircuitData,
+  clearCircuit,
 } = circuitSlice.actions;
 
 export default circuitSlice.reducer;

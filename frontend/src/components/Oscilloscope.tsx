@@ -1,9 +1,9 @@
 import React, { useRef, useEffect, useState } from 'react';
 import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
-import { toggleChannel, toggleOscilloscope } from '../store/simulationSlice';
+import { toggleOscilloscope } from '../store/simulationSlice';
 
-const CHANNEL_COLORS = ['#2DD4BF', '#F59E0B', '#A78BFA', '#FB7185'];
+const CHANNEL_COLORS = ['#4ade80', '#fbbf24', '#38bdf8', '#f472b6']; // Green, Yellow, Blue, Pink
 const GRID_COLOR = 'rgba(255,255,255,0.07)';
 const AXIS_COLOR = 'rgba(255,255,255,0.2)';
 
@@ -23,12 +23,27 @@ const formatVoltage = (v: number): string => {
 const Oscilloscope: React.FC = () => {
   const dispatch = useDispatch();
   const waveformData = useSelector((s: RootState) => s.simulation.waveformData);
-  const activeChannels = useSelector((s: RootState) => s.simulation.activeChannels);
   const oscilloscopeVisible = useSelector((s: RootState) => s.simulation.oscilloscopeVisible);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hoveredTime, setHoveredTime] = useState<number | null>(null);
   const [cursorX, setCursorX] = useState<number | null>(null);
+  
+  // Array of node IDs assigned to CH1, CH2, CH3, CH4
+  const [channels, setChannels] = useState<(number | null)[]>([null, null, null, null]);
+
+  // Auto-assign first nodes on load if empty
+  useEffect(() => {
+    if (waveformData && channels.every(c => c === null)) {
+      const nodes = Object.keys(waveformData.nodeWaveforms).map(Number).filter(n => n !== 0);
+      setChannels([
+        nodes[0] ?? null,
+        nodes[1] ?? null,
+        null,
+        null
+      ]);
+    }
+  }, [waveformData]);
 
   const PADDING = { top: 20, right: 20, bottom: 40, left: 60 };
 
@@ -46,184 +61,239 @@ const Oscilloscope: React.FC = () => {
 
     // Clear
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#0F172A';
+    ctx.fillStyle = '#0f172a'; // Slate 900
     ctx.fillRect(0, 0, W, H);
 
-    // Compute Y range across all active channels
+    // Compute Y range across assigned channels
     let yMin = Infinity, yMax = -Infinity;
-    activeChannels.forEach(ch => {
+    channels.forEach(ch => {
+      if (ch === null) return;
       const wf = waveformData.nodeWaveforms[ch];
       if (!wf) return;
       wf.forEach(v => { if (v < yMin) yMin = v; if (v > yMax) yMax = v; });
     });
-    if (!isFinite(yMin) || !isFinite(yMax)) { yMin = -1; yMax = 1; }
-    if (Math.abs(yMax - yMin) < 1e-9) { yMin -= 0.5; yMax += 0.5; }
-    const yPad = (yMax - yMin) * 0.1;
-    yMin -= yPad; yMax += yPad;
+    
+    if (!isFinite(yMin) || !isFinite(yMax)) { yMin = -5; yMax = 5; }
+    if (Math.abs(yMax - yMin) < 1e-9) { yMin -= 2; yMax += 2; }
 
-    const tStart = waveformData.timePoints[0];
-    const tEnd = waveformData.timePoints[waveformData.timePoints.length - 1];
+    const yRange = yMax - yMin;
+    const yMargin = yRange * 0.1;
+    yMin -= yMargin;
+    yMax += yMargin;
+    const yScale = plotH / (yMax - yMin);
 
-    const toCanvasX = (t: number) =>
-      PADDING.left + ((t - tStart) / (tEnd - tStart)) * plotW;
-    const toCanvasY = (v: number) =>
-      PADDING.top + (1 - (v - yMin) / (yMax - yMin)) * plotH;
+    const tPts = waveformData.timePoints;
+    const tStart = tPts[0];
+    const tEnd = tPts[tPts.length - 1];
+    const tRange = tEnd - tStart;
+    if (tRange <= 0) return;
 
-    // Grid (10x8)
+    // Draw Grid
+    ctx.beginPath();
     ctx.strokeStyle = GRID_COLOR;
     ctx.lineWidth = 1;
-    for (let i = 0; i <= 10; i++) {
-      const x = PADDING.left + (i / 10) * plotW;
-      ctx.beginPath(); ctx.moveTo(x, PADDING.top); ctx.lineTo(x, PADDING.top + plotH); ctx.stroke();
+    const V_LINES = 10;
+    for (let i = 0; i <= V_LINES; i++) {
+      const x = PADDING.left + (i / V_LINES) * plotW;
+      ctx.moveTo(x, PADDING.top);
+      ctx.lineTo(x, H - PADDING.bottom);
     }
-    for (let i = 0; i <= 8; i++) {
-      const y = PADDING.top + (i / 8) * plotH;
-      ctx.beginPath(); ctx.moveTo(PADDING.left, y); ctx.lineTo(PADDING.left + plotW, y); ctx.stroke();
+    const H_LINES = 8;
+    for (let i = 0; i <= H_LINES; i++) {
+      const y = PADDING.top + (i / H_LINES) * plotH;
+      ctx.moveTo(PADDING.left, y);
+      ctx.lineTo(W - PADDING.right, y);
+    }
+    ctx.stroke();
+
+    // Zero axis
+    if (0 >= yMin && 0 <= yMax) {
+      const yZero = PADDING.top + plotH - (0 - yMin) * yScale;
+      ctx.beginPath();
+      ctx.strokeStyle = AXIS_COLOR;
+      ctx.setLineDash([5, 5]);
+      ctx.moveTo(PADDING.left, yZero);
+      ctx.lineTo(W - PADDING.right, yZero);
+      ctx.stroke();
+      ctx.setLineDash([]);
     }
 
-    // Axes
-    ctx.strokeStyle = AXIS_COLOR;
-    ctx.lineWidth = 1.5;
-    // Y axis
-    ctx.beginPath();
-    ctx.moveTo(PADDING.left, PADDING.top);
-    ctx.lineTo(PADDING.left, PADDING.top + plotH);
-    ctx.stroke();
-    // X axis (at V=0 if in range, else at bottom)
-    const zeroY = yMin < 0 && yMax > 0 ? toCanvasY(0) : PADDING.top + plotH;
-    ctx.strokeStyle = 'rgba(255,255,255,0.3)';
-    ctx.setLineDash([4, 4]);
-    ctx.beginPath();
-    ctx.moveTo(PADDING.left, zeroY);
-    ctx.lineTo(PADDING.left + plotW, zeroY);
-    ctx.stroke();
-    ctx.setLineDash([]);
-
-    // Y axis labels
-    ctx.fillStyle = 'rgba(255,255,255,0.5)';
+    // Y labels
+    ctx.fillStyle = '#64748B'; // slate-500
     ctx.font = '10px monospace';
     ctx.textAlign = 'right';
-    for (let i = 0; i <= 4; i++) {
-      const v = yMin + (i / 4) * (yMax - yMin);
-      const y = toCanvasY(v);
-      ctx.fillText(formatVoltage(v), PADDING.left - 5, y + 4);
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i <= H_LINES; i++) {
+      const y = PADDING.top + (i / H_LINES) * plotH;
+      const v = yMax - (i / H_LINES) * (yMax - yMin);
+      ctx.fillText(formatVoltage(v), PADDING.left - 8, y);
     }
 
-    // X axis labels
+    // X labels
     ctx.textAlign = 'center';
-    for (let i = 0; i <= 5; i++) {
-      const t = tStart + (i / 5) * (tEnd - tStart);
-      const x = toCanvasX(t);
-      ctx.fillText(formatTime(t), x, PADDING.top + plotH + 16);
+    ctx.textBaseline = 'top';
+    for (let i = 0; i <= V_LINES; i++) {
+      const x = PADDING.left + (i / V_LINES) * plotW;
+      const t = tStart + (i / V_LINES) * tRange;
+      ctx.fillText(formatTime(t), x, H - PADDING.bottom + 8);
     }
 
-    // Plot waveforms
-    activeChannels.forEach((ch, ci) => {
-      const wf = waveformData.nodeWaveforms[ch];
-      if (!wf || wf.length === 0) return;
-      const color = CHANNEL_COLORS[ci % CHANNEL_COLORS.length];
-
+    // Draw Waveforms
+    channels.forEach((nodeId, idx) => {
+      if (nodeId === null) return;
+      const wf = waveformData.nodeWaveforms[nodeId];
+      if (!wf) return;
+      
+      const color = CHANNEL_COLORS[idx];
+      ctx.beginPath();
       ctx.strokeStyle = color;
       ctx.lineWidth = 2;
-      ctx.beginPath();
-      waveformData.timePoints.forEach((t, i) => {
-        const x = toCanvasX(t);
-        const y = toCanvasY(wf[i]);
+      ctx.lineJoin = 'round';
+
+      wf.forEach((v, i) => {
+        const x = PADDING.left + ((tPts[i] - tStart) / tRange) * plotW;
+        const y = PADDING.top + plotH - (v - yMin) * yScale;
         if (i === 0) ctx.moveTo(x, y);
         else ctx.lineTo(x, y);
       });
       ctx.stroke();
+      
+      // Glow effect
+      ctx.shadowColor = color;
+      ctx.shadowBlur = 10;
+      ctx.stroke();
+      ctx.shadowBlur = 0;
     });
 
-    // Cursor line
-    if (cursorX !== null) {
-      const rect = canvas.getBoundingClientRect();
-      const relX = cursorX - rect.left;
-      if (relX >= PADDING.left && relX <= PADDING.left + plotW) {
-        ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 4]);
+    // Draw Cursor
+    if (cursorX !== null && hoveredTime !== null) {
+      ctx.beginPath();
+      ctx.strokeStyle = '#FCD34D';
+      ctx.lineWidth = 1;
+      ctx.moveTo(cursorX, PADDING.top);
+      ctx.lineTo(cursorX, H - PADDING.bottom);
+      ctx.stroke();
+
+      // Draw values at cursor
+      channels.forEach((nodeId, idx) => {
+        if (nodeId === null) return;
+        const wf = waveformData.nodeWaveforms[nodeId];
+        if (!wf) return;
+        
+        let closestIdx = 0;
+        let minDiff = Infinity;
+        tPts.forEach((t, i) => {
+          const d = Math.abs(t - hoveredTime);
+          if (d < minDiff) { minDiff = d; closestIdx = i; }
+        });
+        
+        const v = wf[closestIdx];
+        const y = PADDING.top + plotH - (v - yMin) * yScale;
+        
+        ctx.fillStyle = CHANNEL_COLORS[idx];
         ctx.beginPath();
-        ctx.moveTo(relX, PADDING.top);
-        ctx.lineTo(relX, PADDING.top + plotH);
+        ctx.arc(cursorX, y, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#1E293B';
         ctx.stroke();
-        ctx.setLineDash([]);
-      }
+        
+        ctx.textAlign = 'left';
+        ctx.font = 'bold 11px monospace';
+        ctx.fillText(`${formatVoltage(v)}`, cursorX + 8, y);
+      });
     }
-  }, [waveformData, activeChannels, cursorX]);
+
+  }, [waveformData, channels, hoveredTime, cursorX]);
 
   if (!waveformData || !oscilloscopeVisible) return null;
-
-  const tStart = waveformData.timePoints[0];
-  const tEnd = waveformData.timePoints[waveformData.timePoints.length - 1];
-  const allNodes = Object.keys(waveformData.nodeWaveforms).map(Number).filter(n => n !== 0);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
-    const relX = e.clientX - rect.left;
-    const plotW = canvas.width - 80;
-    const t = tStart + ((relX - 60) / plotW) * (tEnd - tStart);
-    setHoveredTime(t >= tStart && t <= tEnd ? t : null);
-    setCursorX(e.clientX);
+    const x = e.clientX - rect.left;
+    if (x >= PADDING.left && x <= canvas.width - PADDING.right) {
+      setCursorX(x);
+      const tPts = waveformData.timePoints;
+      const tRange = tPts[tPts.length - 1] - tPts[0];
+      const t = tPts[0] + ((x - PADDING.left) / (canvas.width - PADDING.left - PADDING.right)) * tRange;
+      setHoveredTime(t);
+    } else {
+      setHoveredTime(null);
+      setCursorX(null);
+    }
+  };
+
+  const allNodes = Object.keys(waveformData.nodeWaveforms).map(Number).filter(n => n !== 0);
+
+  const handleChannelChange = (idx: number, nodeIdStr: string) => {
+    const newChannels = [...channels];
+    newChannels[idx] = nodeIdStr === 'OFF' ? null : Number(nodeIdStr);
+    setChannels(newChannels);
   };
 
   return (
-    <div className="absolute bottom-10 left-0 right-0 mx-auto w-[760px] bg-gray-950 rounded-xl border border-gray-700 shadow-2xl z-30 overflow-hidden">
+    <div className="absolute bottom-10 left-0 right-0 mx-auto w-[800px] bg-gray-900 rounded-xl border border-gray-700 shadow-2xl z-30 overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-900 border-b border-gray-700">
+      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
         <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-gray-300 uppercase tracking-widest">⊡ Osciloscopio Virtual</span>
-          <span className="text-xs text-gray-500 font-mono">
-            {formatTime(tStart)} → {formatTime(tEnd)}
+          <span className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
+            <span className="w-2 h-2 rounded bg-blue-500 inline-block animate-pulse"></span>
+            Osciloscopio
           </span>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-4">
           {hoveredTime !== null && (
-            <span className="text-xs font-mono text-yellow-400 mr-2">t = {formatTime(hoveredTime)}</span>
+            <span className="text-xs font-mono text-yellow-400 bg-gray-900 px-2 py-1 rounded">t = {formatTime(hoveredTime)}</span>
           )}
           <button
             onClick={() => dispatch(toggleOscilloscope())}
-            className="text-gray-400 hover:text-white text-lg leading-none px-1"
+            className="text-gray-400 hover:text-white text-lg leading-none"
           >×</button>
         </div>
       </div>
 
       {/* Canvas */}
-      <canvas
-        ref={canvasRef}
-        width={760}
-        height={260}
-        onMouseMove={handleMouseMove}
-        onMouseLeave={() => { setHoveredTime(null); setCursorX(null); }}
-        className="block w-full"
-        style={{ cursor: 'crosshair' }}
-      />
+      <div className="bg-[#0f172a] p-1">
+        <canvas
+          ref={canvasRef}
+          width={790}
+          height={280}
+          onMouseMove={handleMouseMove}
+          onMouseLeave={() => { setHoveredTime(null); setCursorX(null); }}
+          className="block w-full rounded"
+          style={{ cursor: 'crosshair' }}
+        />
+      </div>
 
-      {/* Channel selector */}
-      <div className="flex items-center gap-3 px-4 py-2 bg-gray-900 border-t border-gray-700 flex-wrap">
-        <span className="text-xs text-gray-500 font-semibold">Canales:</span>
-        {allNodes.map((nodeId, ci) => {
-          const label = waveformData.nodeLabels[nodeId] ?? `N${nodeId}`;
-          const color = CHANNEL_COLORS[ci % CHANNEL_COLORS.length];
-          const isActive = activeChannels.includes(nodeId);
-          // Get current value (last point)
-          const lastVal = waveformData.nodeWaveforms[nodeId]?.at(-1) ?? 0;
+      {/* Channel Config Panel */}
+      <div className="flex items-center px-4 py-3 bg-gray-800 border-t border-gray-700 gap-4">
+        {[1, 2, 3, 4].map((ch, i) => {
+          const color = CHANNEL_COLORS[i];
+          const assignedNode = channels[i];
+          const lastVal = assignedNode !== null ? waveformData.nodeWaveforms[assignedNode]?.at(-1) : null;
+          
           return (
-            <button
-              key={nodeId}
-              onClick={() => dispatch(toggleChannel(nodeId))}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono border transition-all ${
-                isActive
-                  ? 'border-current text-white opacity-100'
-                  : 'border-gray-600 text-gray-500 opacity-50'
-              }`}
-              style={{ borderColor: isActive ? color : undefined, color: isActive ? color : undefined }}
-            >
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }} />
-              {label} = {formatVoltage(lastVal)}
-            </button>
+            <div key={ch} className="flex-1 flex flex-col gap-1 border-r border-gray-700 last:border-0 pr-4">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-bold" style={{ color }}>CH{ch}</span>
+                {lastVal !== null && (
+                  <span className="text-[10px] font-mono text-gray-400">{formatVoltage(lastVal)}</span>
+                )}
+              </div>
+              <select
+                className="bg-gray-900 border border-gray-600 text-xs text-gray-300 rounded px-1 py-1 w-full outline-none"
+                value={assignedNode === null ? 'OFF' : assignedNode.toString()}
+                onChange={(e) => handleChannelChange(i, e.target.value)}
+              >
+                <option value="OFF">Apagado</option>
+                {allNodes.map(n => (
+                  <option key={n} value={n}>
+                    {waveformData.nodeLabels[n] ?? `Nodo ${n}`}
+                  </option>
+                ))}
+              </select>
+            </div>
           );
         })}
       </div>

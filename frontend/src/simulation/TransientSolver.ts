@@ -63,7 +63,7 @@ export function solveTransient(
   const nodeIdx = (n: number) => n - 1;
 
   // ── Función interna: armar y resolver matriz MNA para un instante ───────
-  const solveStep = (capState: Record<string, number>): number[] | null => {
+  const solveStep = (capState: Record<string, number>, t: number): number[] | null => {
     const nExtra = voltageSources.length + opAmps.length;
     const size = nNodes + nExtra;
     if (size === 0) return null;
@@ -107,7 +107,27 @@ export function solveTransient(
       const [np, nm] = el.nodes;
       if (np !== 0) { G[nodeIdx(np)][vsRow] += 1; G[vsRow][nodeIdx(np)] += 1; }
       if (nm !== 0) { G[nodeIdx(nm)][vsRow] -= 1; G[vsRow][nodeIdx(nm)] -= 1; }
-      I[vsRow] = el.value;
+      
+      // Calcular valor de la fuente en el tiempo t
+      let v = el.value;
+      if (el.waveform === 'sine') {
+        v = (el.offset || 0) + (el.amplitude || 5) * Math.sin(2 * Math.PI * (el.frequency || 1000) * t);
+      } else if (el.waveform === 'square') {
+        v = (el.offset || 0) + (el.amplitude || 5) * Math.sign(Math.sin(2 * Math.PI * (el.frequency || 1000) * t));
+      } else if (el.waveform === 'triangle') {
+        // Onda triangular usando asinc
+        const f = el.frequency || 1000;
+        const p = 1 / f;
+        const phase = t % p;
+        const norm = phase / p;
+        let tri = 0;
+        if (norm < 0.25) tri = norm * 4;
+        else if (norm < 0.75) tri = 1 - (norm - 0.25) * 4;
+        else tri = -1 + (norm - 0.75) * 4;
+        v = (el.offset || 0) + (el.amplitude || 5) * tri;
+      }
+      
+      I[vsRow] = v;
     });
 
     // Op-Amps (ideal - virtual short)
@@ -128,7 +148,7 @@ export function solveTransient(
     const t = tStart + step * dt;
     timePoints.push(parseFloat(t.toFixed(9)));
 
-    const sol = solveStep(capVoltages);
+    const sol = solveStep(capVoltages, t);
     if (!sol) {
       return { success: false, error: `No se pudo resolver en t=${t.toExponential(2)}s. Verifica el circuito.` };
     }
