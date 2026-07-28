@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { Stage, Layer, Rect, Text, Group, Circle, Line, Arrow } from 'react-konva';
 import type { KonvaEventObject } from 'konva/lib/Node';
 import type Konva from 'konva';
@@ -66,6 +66,22 @@ const CircuitCanvas: React.FC = () => {
       setMousePos(null);
     }
   };
+
+  // Export PNG listener
+  useEffect(() => {
+    const handleExport = (e: Event) => {
+      const customEvent = e as CustomEvent;
+      const stage = stageRef.current;
+      if (!stage) return;
+      const dataURL = stage.toDataURL({ pixelRatio: 2 }); // High quality export
+      const a = document.createElement('a');
+      a.href = dataURL;
+      a.download = `${customEvent.detail?.name || 'circuito'}.png`;
+      a.click();
+    };
+    window.addEventListener('export-png', handleExport);
+    return () => window.removeEventListener('export-png', handleExport);
+  }, []);
 
   // Render wires (completed connections)
   const renderConnections = () => {

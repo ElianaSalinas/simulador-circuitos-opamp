@@ -52,6 +52,7 @@ const App: React.FC = () => {
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showCircuitManager, setShowCircuitManager] = useState(false)
   const [showExamples, setShowExamples] = useState(false)
+  const [showFileMenu, setShowFileMenu] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────
@@ -164,6 +165,51 @@ const App: React.FC = () => {
     }
   };
 
+  const handleExportJSON = () => {
+    const dataStr = JSON.stringify({ components, connections }, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `${circuitName || 'circuito'}.circuit.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setShowFileMenu(false);
+  };
+
+  const handleImportJSON = () => {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e: any) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (ev: any) => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (data.components && data.connections) {
+            dispatch(loadCircuitData(data));
+            dispatch(setCircuitMetadata({ id: '', name: file.name.replace('.circuit.json', '').replace('.json', '') }));
+            showToast('Circuito importado correctamente', 'success');
+          } else {
+            showToast('El archivo JSON no tiene el formato correcto', 'error');
+          }
+        } catch (err) {
+          showToast('Error al leer el archivo JSON', 'error');
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+    setShowFileMenu(false);
+  };
+
+  const handleExportPNG = () => {
+    window.dispatchEvent(new CustomEvent('export-png', { detail: { name: circuitName || 'circuito' } }));
+    setShowFileMenu(false);
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden relative font-sans">
       <Toast />
@@ -179,6 +225,27 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Menú Archivo */}
+          <div className="relative mr-2">
+            <button onClick={() => setShowFileMenu(!showFileMenu)} className="px-3 py-1.5 text-xs rounded-md bg-gray-800 hover:bg-gray-700 text-gray-200 border border-gray-600 transition-colors flex items-center gap-1">
+              Archivo ▾
+            </button>
+            {showFileMenu && (
+              <div className="absolute top-full left-0 mt-1 w-48 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 z-50">
+                <button onClick={handleImportJSON} className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition-colors">
+                  📂 Importar JSON...
+                </button>
+                <button onClick={handleExportJSON} className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition-colors">
+                  💾 Exportar JSON
+                </button>
+                <div className="my-1 border-t border-gray-700"></div>
+                <button onClick={handleExportPNG} className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition-colors">
+                  📷 Exportar como PNG
+                </button>
+              </div>
+            )}
+          </div>
+
           {/* Ejemplos */}
           <div className="relative mr-2">
             <button onClick={() => setShowExamples(!showExamples)} className="px-3 py-1.5 text-xs rounded-md bg-purple-600/80 hover:bg-purple-600 text-white font-semibold transition-colors flex items-center gap-1">
