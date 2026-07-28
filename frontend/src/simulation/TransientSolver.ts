@@ -147,7 +147,7 @@ export function solveTransient(
           if (nOut !== 0) G[opRow][nodeIdx(nOut)] = 1; else G[opRow][opRow] = 1;
           if (nInP !== 0) G[opRow][nodeIdx(nInP)] = -1e5;
           if (nInN !== 0) G[opRow][nodeIdx(nInN)] = 1e5;
-          I[opRow] = 0;
+          I[opRow] = 100; // 1mV offset para arrancar osciladores (1e5 * 1e-3)
         } else if (state === 'SAT_HIGH') {
           if (nOut !== 0) G[opRow][nodeIdx(nOut)] = 1; else G[opRow][opRow] = 1;
           I[opRow] = 15; // +Vsat
@@ -170,7 +170,7 @@ export function solveTransient(
         const vP = nInP === 0 ? 0 : solution[nodeIdx(nInP)];
         const vN = nInN === 0 ? 0 : solution[nodeIdx(nInN)];
         const vOut = nOut === 0 ? 0 : solution[nodeIdx(nOut)];
-        const linearOut = 1e5 * (vP - vN);
+        const linearOut = 1e5 * (vP - vN + 1e-3); // 1mV offset
 
         let nextState = state;
         if (state === 'LINEAR') {
