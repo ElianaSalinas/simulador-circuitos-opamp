@@ -9,15 +9,17 @@ const getHeaders = () => {
 };
 
 const handleResponse = async (res: Response) => {
-  if (res.status === 401 || res.status === 403) {
-    // Token expired or invalid
-    localStorage.removeItem('token');
-    localStorage.removeItem('user');
-    window.dispatchEvent(new CustomEvent('auth-expired'));
-    throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
-  }
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
+    
+    // Si es 401/403 pero no viene de login, es sesión expirada
+    if ((res.status === 401 || res.status === 403) && !res.url.includes('/auth/login') && !res.url.includes('/auth/register')) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.dispatchEvent(new CustomEvent('auth-expired'));
+      throw new Error('Sesión expirada. Por favor, inicia sesión nuevamente.');
+    }
+    
     throw new Error(errorData.error || 'Ocurrió un error en la petición');
   }
   return res.json();
