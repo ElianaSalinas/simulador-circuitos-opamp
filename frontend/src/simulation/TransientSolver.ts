@@ -63,84 +63,135 @@ export function solveTransient(
   const nodeIdx = (n: number) => n - 1;
 
   // ── Función interna: armar y resolver matriz MNA para un instante ───────
+  const currentOpAmpStates: Record<string, 'LINEAR'|'SAT_HIGH'|'SAT_LOW'> = {};
+  opAmps.forEach(el => { currentOpAmpStates[el.id] = 'LINEAR'; });
+
   const solveStep = (capState: Record<string, number>, t: number): number[] | null => {
     const nExtra = voltageSources.length + opAmps.length;
     const size = nNodes + nExtra;
     if (size === 0) return null;
 
-    const G: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
-    const I: number[] = new Array(size).fill(0);
+    let solution: number[] | null = null;
 
-    // Resistores
-    for (const el of elements) {
-      if (el.type !== 'R') continue;
-      const [a, b] = el.nodes;
-      const g = 1 / el.value;
-      if (a !== 0) G[nodeIdx(a)][nodeIdx(a)] += g;
-      if (b !== 0) G[nodeIdx(b)][nodeIdx(b)] += g;
-      if (a !== 0 && b !== 0) {
-        G[nodeIdx(a)][nodeIdx(b)] -= g;
-        G[nodeIdx(b)][nodeIdx(a)] -= g;
+    for (let iter = 0; iter < 10; iter++) {
+      const G: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
+      const I: number[] = new Array(size).fill(0);
+
+      // Resistores
+      for (const el of elements) {
+        if (el.type !== 'R') continue;
+        const [a, b] = el.nodes;
+        const g = 1 / el.value;
+        if (a !== 0) G[nodeIdx(a)][nodeIdx(a)] += g;
+        if (b !== 0) G[nodeIdx(b)][nodeIdx(b)] += g;
+        if (a !== 0 && b !== 0) {
+          G[nodeIdx(a)][nodeIdx(b)] -= g;
+          G[nodeIdx(b)][nodeIdx(a)] -= g;
+        }
       }
+
+      // Capacitores → Companion model (Backward Euler)
+      for (const el of capacitors) {
+        const [a, b] = el.nodes;
+        const geq = el.value / dt;     // C/Δt
+        const ieq = geq * capState[el.id]; // corriente equivalente
+        // Resistencia equivalente
+        if (a !== 0) G[nodeIdx(a)][nodeIdx(a)] += geq;
+        if (b !== 0) G[nodeIdx(b)][nodeIdx(b)] += geq;
+        if (a !== 0 && b !== 0) {
+          G[nodeIdx(a)][nodeIdx(b)] -= geq;
+          G[nodeIdx(b)][nodeIdx(a)] -= geq;
+        }
+        // Fuente de corriente equivalente
+        if (a !== 0) I[nodeIdx(a)] += ieq;
+        if (b !== 0) I[nodeIdx(b)] -= ieq;
+      }
+
+      // Fuentes de voltaje
+      voltageSources.forEach((el, k) => {
+        const vsRow = nNodes + k;
+        const [np, nm] = el.nodes;
+        if (np !== 0) { G[nodeIdx(np)][vsRow] += 1; G[vsRow][nodeIdx(np)] += 1; }
+        if (nm !== 0) { G[nodeIdx(nm)][vsRow] -= 1; G[vsRow][nodeIdx(nm)] -= 1; }
+        
+        // Calcular valor de la fuente en el tiempo t
+        let v = el.value;
+        if (el.waveform === 'sine') {
+          v = (el.offset || 0) + (el.amplitude || 5) * Math.sin(2 * Math.PI * (el.frequency || 1000) * t);
+        } else if (el.waveform === 'square') {
+          v = (el.offset || 0) + (el.amplitude || 5) * Math.sign(Math.sin(2 * Math.PI * (el.frequency || 1000) * t));
+        } else if (el.waveform === 'triangle') {
+          const f = el.frequency || 1000;
+          const p = 1 / f;
+          const phase = t % p;
+          const norm = phase / p;
+          let tri = 0;
+          if (norm < 0.25) tri = norm * 4;
+          else if (norm < 0.75) tri = 1 - (norm - 0.25) * 4;
+          else tri = -1 + (norm - 0.75) * 4;
+          v = (el.offset || 0) + (el.amplitude || 5) * tri;
+        }
+        
+        I[vsRow] = v;
+      });
+
+      // Op-Amps (PWL model con saturación)
+      opAmps.forEach((el, k) => {
+        const opRow = nNodes + voltageSources.length + k;
+        const [nInP, nInN, nOut] = el.nodes;
+        const state = currentOpAmpStates[el.id];
+
+        if (nOut !== 0) G[nodeIdx(nOut)][opRow] += 1;
+
+        if (state === 'LINEAR') {
+          if (nOut !== 0) G[opRow][nodeIdx(nOut)] = 1; else G[opRow][opRow] = 1;
+          if (nInP !== 0) G[opRow][nodeIdx(nInP)] = -1e5;
+          if (nInN !== 0) G[opRow][nodeIdx(nInN)] = 1e5;
+          I[opRow] = 0;
+        } else if (state === 'SAT_HIGH') {
+          if (nOut !== 0) G[opRow][nodeIdx(nOut)] = 1; else G[opRow][opRow] = 1;
+          I[opRow] = 15; // +Vsat
+        } else if (state === 'SAT_LOW') {
+          if (nOut !== 0) G[opRow][nodeIdx(nOut)] = 1; else G[opRow][opRow] = 1;
+          I[opRow] = -15; // -Vsat
+        }
+      });
+
+      solution = gaussianElimination(G, I);
+      if (!solution) break; // Singular
+
+      // Convergencia de estados
+      let changed = false;
+      for (let k = 0; k < opAmps.length; k++) {
+        const el = opAmps[k];
+        const state = currentOpAmpStates[el.id];
+        const [nInP, nInN, nOut] = el.nodes;
+        
+        const vP = nInP === 0 ? 0 : solution[nodeIdx(nInP)];
+        const vN = nInN === 0 ? 0 : solution[nodeIdx(nInN)];
+        const vOut = nOut === 0 ? 0 : solution[nodeIdx(nOut)];
+        const linearOut = 1e5 * (vP - vN);
+
+        let nextState = state;
+        if (state === 'LINEAR') {
+          if (vOut > 15) nextState = 'SAT_HIGH';
+          else if (vOut < -15) nextState = 'SAT_LOW';
+        } else if (state === 'SAT_HIGH') {
+          if (linearOut < 15) nextState = 'LINEAR';
+        } else if (state === 'SAT_LOW') {
+          if (linearOut > -15) nextState = 'LINEAR';
+        }
+
+        if (nextState !== state) {
+          currentOpAmpStates[el.id] = nextState;
+          changed = true;
+        }
+      }
+
+      if (!changed) break; // Converged
     }
 
-    // Capacitores → Companion model (Backward Euler)
-    for (const el of capacitors) {
-      const [a, b] = el.nodes;
-      const geq = el.value / dt;     // C/Δt
-      const ieq = geq * capState[el.id]; // corriente equivalente
-      // Resistencia equivalente
-      if (a !== 0) G[nodeIdx(a)][nodeIdx(a)] += geq;
-      if (b !== 0) G[nodeIdx(b)][nodeIdx(b)] += geq;
-      if (a !== 0 && b !== 0) {
-        G[nodeIdx(a)][nodeIdx(b)] -= geq;
-        G[nodeIdx(b)][nodeIdx(a)] -= geq;
-      }
-      // Fuente de corriente equivalente
-      if (a !== 0) I[nodeIdx(a)] += ieq;
-      if (b !== 0) I[nodeIdx(b)] -= ieq;
-    }
-
-    // Fuentes de voltaje
-    voltageSources.forEach((el, k) => {
-      const vsRow = nNodes + k;
-      const [np, nm] = el.nodes;
-      if (np !== 0) { G[nodeIdx(np)][vsRow] += 1; G[vsRow][nodeIdx(np)] += 1; }
-      if (nm !== 0) { G[nodeIdx(nm)][vsRow] -= 1; G[vsRow][nodeIdx(nm)] -= 1; }
-      
-      // Calcular valor de la fuente en el tiempo t
-      let v = el.value;
-      if (el.waveform === 'sine') {
-        v = (el.offset || 0) + (el.amplitude || 5) * Math.sin(2 * Math.PI * (el.frequency || 1000) * t);
-      } else if (el.waveform === 'square') {
-        v = (el.offset || 0) + (el.amplitude || 5) * Math.sign(Math.sin(2 * Math.PI * (el.frequency || 1000) * t));
-      } else if (el.waveform === 'triangle') {
-        // Onda triangular usando asinc
-        const f = el.frequency || 1000;
-        const p = 1 / f;
-        const phase = t % p;
-        const norm = phase / p;
-        let tri = 0;
-        if (norm < 0.25) tri = norm * 4;
-        else if (norm < 0.75) tri = 1 - (norm - 0.25) * 4;
-        else tri = -1 + (norm - 0.75) * 4;
-        v = (el.offset || 0) + (el.amplitude || 5) * tri;
-      }
-      
-      I[vsRow] = v;
-    });
-
-    // Op-Amps (ideal - virtual short)
-    opAmps.forEach((el, k) => {
-      const opRow = nNodes + voltageSources.length + k;
-      const [nInP, nInN, nOut] = el.nodes;
-      if (nOut !== 0) G[nodeIdx(nOut)][opRow] += 1;
-      if (nInP !== 0) G[opRow][nodeIdx(nInP)] = 1;
-      if (nInN !== 0) G[opRow][nodeIdx(nInN)] = -1;
-      I[opRow] = 0;
-    });
-
-    return gaussianElimination(G, I);
+    return solution;
   };
 
   // ── Loop temporal ────────────────────────────────────────────────────────

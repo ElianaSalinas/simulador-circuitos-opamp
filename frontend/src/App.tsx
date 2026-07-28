@@ -21,9 +21,10 @@ import Oscilloscope from './components/Oscilloscope'
 import AuthModal from './components/AuthModal'
 import CircuitManagerModal from './components/CircuitManagerModal'
 import { logout } from './store/authSlice'
-import { setCircuitMetadata, clearCircuit } from './store/circuitSlice'
+import { setCircuitMetadata, clearCircuit, loadCircuitData } from './store/circuitSlice'
 import { api } from './api'
 import Toast, { showToast } from './components/Toast'
+import { predefinedCircuits } from './library/circuits'
 
 // ── Transient time presets ──────────────────────────────────────────────────
 const TIME_PRESETS = [
@@ -50,6 +51,7 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'dc' | 'transient'>('dc')
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showCircuitManager, setShowCircuitManager] = useState(false)
+  const [showExamples, setShowExamples] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
 
   // ── Keyboard shortcuts ──────────────────────────────────────────────────
@@ -152,6 +154,16 @@ const App: React.FC = () => {
   const hasErrors = validationErrors.length > 0
   const canSimulate = components.length > 0 && !hasErrors
 
+  const handleLoadExample = (circuitId: string) => {
+    const example = predefinedCircuits.find(c => c.id === circuitId);
+    if (example) {
+      dispatch(loadCircuitData(example.data as any));
+      dispatch(setCircuitMetadata({ id: '', name: example.name }));
+      setShowExamples(false);
+      showToast(`Ejemplo cargado: ${example.name}`, 'info');
+    }
+  };
+
   return (
     <div className="h-screen flex flex-col bg-gray-900 text-white overflow-hidden relative font-sans">
       <Toast />
@@ -167,6 +179,22 @@ const App: React.FC = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Ejemplos */}
+          <div className="relative mr-2">
+            <button onClick={() => setShowExamples(!showExamples)} className="px-3 py-1.5 text-xs rounded-md bg-purple-600/80 hover:bg-purple-600 text-white font-semibold transition-colors flex items-center gap-1">
+              Ejemplos ▾
+            </button>
+            {showExamples && (
+              <div className="absolute top-full left-0 mt-1 w-64 bg-gray-800 border border-gray-700 rounded-lg shadow-xl py-1 z-50">
+                {predefinedCircuits.map(c => (
+                  <button key={c.id} onClick={() => handleLoadExample(c.id)} className="block w-full text-left px-4 py-2 text-sm text-gray-200 hover:bg-gray-700 hover:text-white transition-colors">
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
           {/* Auth & Persistence */}
           {auth.user ? (
             <div className="flex items-center gap-2 mr-4 border-r border-gray-700 pr-4">
