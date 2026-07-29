@@ -144,6 +144,11 @@ export function solveTransient(
         if (nOut !== 0) G[nodeIdx(nOut)][opRow] += 1;
 
         if (state === 'LINEAR') {
+          // Solución al problema de osciladores que no arrancan en simulación transitoria:
+          // Circuitos como el Multivibrador Astable o el Oscilador de Wien inician en equilibrio perfecto (0V).
+          // En la vida real, el ruido térmico desestabiliza el circuito y arranca la oscilación.
+          // Aquí inyectamos un voltaje de offset artificial (Voffset = 1mV) para simular ese ruido inicial.
+          // Ecuación: Vout = A*(Vp - Vn + Voffset) => A*Vp - A*Vn - Vout = -A*Voffset
           if (nOut !== 0) G[opRow][nodeIdx(nOut)] = 1; else G[opRow][opRow] = 1;
           if (nInP !== 0) G[opRow][nodeIdx(nInP)] = -1e5;
           if (nInN !== 0) G[opRow][nodeIdx(nInN)] = 1e5;

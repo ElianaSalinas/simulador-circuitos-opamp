@@ -96,6 +96,10 @@ export function solveMNA(
       for (let c = 0; c < size; c++) G[r][c] = 0;
       I[r] = 0;
       // Añadir una conductancia mínima a tierra (GMIN) en cada nodo para evitar matriz singular por nodos flotantes
+      // Solución al error de convergencia en DC para circuitos con capacitores (ej. Oscilador de Wien):
+      // En DC los capacitores se comportan como circuitos abiertos. Esto causaba que partes del circuito
+      // quedaran completamente aisladas sin conexión a tierra. Al inyectar un GMIN (1e-12 Siemens) en
+      // la diagonal principal, estabilizamos la matriz sin alterar los resultados reales de la simulación.
       if (r < nNodes) {
         G[r][r] = GMIN;
       }

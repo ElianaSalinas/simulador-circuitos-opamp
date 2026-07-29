@@ -115,8 +115,10 @@ export function buildNetlist(
         const nInN = getNode(comp.id, 'in-');
         const nOut = getNode(comp.id, 'out');
         // Ideal Op-Amp: modeled as VCVS Vout = A*(Vin+ - Vin-)
-        // Supply rails are not stamped in the ideal model, so we don't assign them node IDs 
-        // unless they are connected to other components that do.
+        // Solución a matrices singulares por pines de alimentación desconectados (V+, V-):
+        // Anteriormente, si el usuario dejaba V+ y V- sin conectar, se creaban nodos flotantes 
+        // sin conductancia que generaban filas de ceros en la matriz (error matemático instantáneo).
+        // Al ignorar estos pines y no asignarles ID de nodo en el modelo ideal, evitamos el error.
         elements.push({ id: comp.id, type: 'OpAmp', nodes: [nInP, nInN, nOut], value: 1e6, label: comp.label });
         break;
       }
