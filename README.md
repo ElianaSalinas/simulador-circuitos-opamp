@@ -44,12 +44,14 @@ simulador-circuitos-opamp/
 | Fase      | Estado       | Descripción                                  |
 |-----------|-------------|----------------------------------------------|
 | Fase 0    | ✅ Completo  | Setup monorepo, boilerplate frontend/backend |
-| Sprint 1  | 🔄 En progreso | Lienzo interactivo y paleta de componentes  |
-| Sprint 2  | ⏳ Pendiente | Conexiones y validación de circuitos         |
-| Sprint 3  | ⏳ Pendiente | Motor de simulación DC (MNA)                 |
-| Sprint 4  | ⏳ Pendiente | Análisis transitorio y modelos Op-Amp        |
-| Sprint 5  | ⏳ Pendiente | Instrumentos virtuales (Osciloscopio, etc.)  |
-| Sprint 6  | ⏳ Pendiente | Autenticación y persistencia                 |
+| Sprint 1  | ✅ Completo  | Lienzo interactivo y paleta de componentes   |
+| Sprint 2  | ✅ Completo  | Conexiones y validación de circuitos         |
+| Sprint 3  | ✅ Completo  | Motor de simulación DC (MNA)                 |
+| Sprint 4  | ✅ Completo  | Análisis transitorio y modelos Op-Amp        |
+| Sprint 5  | ✅ Completo  | Instrumentos virtuales (Osciloscopio, etc.)  |
+| Sprint 6  | ✅ Completo  | Autenticación y persistencia                 |
+| Sprint 7  | ✅ Completo  | Biblioteca de circuitos prediseñados         |
+| Sprint 8  | 🔄 En progreso| Testing, pulido y exportación                |
 
 ---
 
