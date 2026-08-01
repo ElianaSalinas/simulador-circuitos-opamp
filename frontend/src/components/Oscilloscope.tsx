@@ -3,7 +3,7 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { toggleOscilloscope } from '../store/simulationSlice';
 
-const CHANNEL_COLORS = ['#4ade80', '#fbbf24', '#38bdf8', '#f472b6']; // Green, Yellow, Blue, Pink
+const CHANNEL_COLORS = ['#38bdf8', '#4ade80', '#fbbf24', '#f472b6']; // Blue, Green, Yellow, Pink
 const GRID_COLOR = 'rgba(255,255,255,0.07)';
 const AXIS_COLOR = 'rgba(255,255,255,0.2)';
 
@@ -20,6 +20,36 @@ const formatVoltage = (v: number): string => {
   return `${(v * 1e6).toFixed(2)} µV`;
 };
 
+const computeMetrics = (timePoints: number[], wf: number[] | undefined) => {
+  if (!wf || wf.length === 0) return null;
+  let min = Infinity, max = -Infinity;
+  for (let i = 0; i < wf.length; i++) {
+    if (wf[i] < min) min = wf[i];
+    if (wf[i] > max) max = wf[i];
+  }
+  const vpp = max - min;
+  const mid = (max + min) / 2;
+
+  let crossings = 0;
+  let firstT = 0;
+  let lastT = 0;
+
+  for (let i = 1; i < wf.length; i++) {
+    if (wf[i - 1] < mid && wf[i] >= mid) {
+      if (crossings === 0) firstT = timePoints[i];
+      lastT = timePoints[i];
+      crossings++;
+    }
+  }
+
+  let freq = 0;
+  if (crossings > 1 && lastT > firstT) {
+    freq = (crossings - 1) / (lastT - firstT);
+  }
+
+  return { min, max, vpp, freq };
+};
+
 const Oscilloscope: React.FC = () => {
   const dispatch = useDispatch();
   const waveformData = useSelector((s: RootState) => s.simulation.waveformData);
@@ -32,15 +62,33 @@ const Oscilloscope: React.FC = () => {
   // Array of node IDs assigned to CH1, CH2, CH3, CH4
   const [channels, setChannels] = useState<(number | null)[]>([null, null, null, null]);
 
-  // Auto-assign first nodes on load if empty
+  // Smart Auto-assign nodes when waveformData is loaded or changed
   useEffect(() => {
-    if (waveformData && channels.every(c => c === null)) {
-      const nodes = Object.keys(waveformData.nodeWaveforms).map(Number).filter(n => n !== 0);
+    if (waveformData) {
+      const nodes = Object.keys(waveformData.nodeWaveforms)
+        .map(Number)
+        .filter(n => n !== 0);
+
+      // Prioritize output nodes and key feedback points
+      const scoredNodes = [...nodes].sort((a, b) => {
+        const labelA = waveformData.nodeLabels[a] || '';
+        const labelB = waveformData.nodeLabels[b] || '';
+        
+        const getScore = (label: string) => {
+          if (label.includes('.out') || label.includes('out')) return 3;
+          if (label.includes('.in-') || label.includes('in-') || label.includes('C1')) return 2;
+          if (label.includes('.in+') || label.includes('in+')) return 1;
+          return 0;
+        };
+
+        return getScore(labelB) - getScore(labelA);
+      });
+
       setChannels([
-        nodes[0] ?? null,
-        nodes[1] ?? null,
-        null,
-        null
+        scoredNodes[0] ?? null,
+        scoredNodes[1] ?? null,
+        scoredNodes[2] ?? null,
+        scoredNodes[3] ?? null
       ]);
     }
   }, [waveformData]);
@@ -160,7 +208,7 @@ const Oscilloscope: React.FC = () => {
       
       // Glow effect
       ctx.shadowColor = color;
-      ctx.shadowBlur = 10;
+      ctx.shadowBlur = 8;
       ctx.stroke();
       ctx.shadowBlur = 0;
     });
@@ -233,31 +281,33 @@ const Oscilloscope: React.FC = () => {
   };
 
   return (
-    <div className="absolute bottom-10 left-0 right-0 mx-auto w-[800px] bg-gray-900 rounded-xl border border-gray-700 shadow-2xl z-30 overflow-hidden">
+    <div className="absolute bottom-6 left-0 right-0 mx-auto w-[850px] bg-gray-900 rounded-xl border border-gray-700 shadow-2xl z-30 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
         <div className="flex items-center gap-3">
           <span className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
-            <span className="w-2 h-2 rounded bg-blue-500 inline-block animate-pulse"></span>
-            Osciloscopio
+            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block animate-pulse"></span>
+            Osciloscopio Digital de 4 Canales
           </span>
         </div>
         <div className="flex items-center gap-4">
           {hoveredTime !== null && (
-            <span className="text-xs font-mono text-yellow-400 bg-gray-900 px-2 py-1 rounded">t = {formatTime(hoveredTime)}</span>
+            <span className="text-xs font-mono text-yellow-400 bg-gray-900 px-2.5 py-1 rounded border border-gray-700">
+              t = {formatTime(hoveredTime)}
+            </span>
           )}
           <button
             onClick={() => dispatch(toggleOscilloscope())}
-            className="text-gray-400 hover:text-white text-lg leading-none"
+            className="text-gray-400 hover:text-white text-lg leading-none transition-colors"
           >×</button>
         </div>
       </div>
 
       {/* Canvas */}
-      <div className="bg-[#0f172a] p-1">
+      <div className="bg-[#0f172a] p-1.5">
         <canvas
           ref={canvasRef}
-          width={790}
+          width={838}
           height={280}
           onMouseMove={handleMouseMove}
           onMouseLeave={() => { setHoveredTime(null); setCursorX(null); }}
@@ -266,33 +316,53 @@ const Oscilloscope: React.FC = () => {
         />
       </div>
 
-      {/* Channel Config Panel */}
-      <div className="flex items-center px-4 py-3 bg-gray-800 border-t border-gray-700 gap-4">
-        {[1, 2, 3, 4].map((ch, i) => {
+      {/* Channel Config Panel & Real-time Metrics */}
+      <div className="grid grid-cols-4 px-4 py-3 bg-gray-800 border-t border-gray-700 gap-3">
+        {[0, 1, 2, 3].map((i) => {
           const color = CHANNEL_COLORS[i];
           const assignedNode = channels[i];
-          const lastVal = assignedNode !== null ? waveformData.nodeWaveforms[assignedNode]?.at(-1) : null;
+          const wf = assignedNode !== null ? waveformData.nodeWaveforms[assignedNode] : undefined;
+          const metrics = computeMetrics(waveformData.timePoints, wf);
           
           return (
-            <div key={ch} className="flex-1 flex flex-col gap-1 border-r border-gray-700 last:border-0 pr-4">
+            <div key={i} className="flex flex-col gap-1.5 p-2 bg-gray-900/60 rounded-lg border border-gray-700/60">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold" style={{ color }}>CH{ch}</span>
-                {lastVal !== null && lastVal !== undefined && (
-                  <span className="text-[10px] font-mono text-gray-400">{formatVoltage(lastVal)}</span>
+                <span className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>
+                  <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }}></span>
+                  CH{i + 1}
+                </span>
+                {metrics && metrics.freq > 0 && (
+                  <span className="text-[10px] font-mono font-semibold text-emerald-400">
+                    {metrics.freq >= 1000 ? `${(metrics.freq / 1000).toFixed(2)} kHz` : `${metrics.freq.toFixed(1)} Hz`}
+                  </span>
                 )}
               </div>
               <select
-                className="bg-gray-900 border border-gray-600 text-xs text-gray-300 rounded px-1 py-1 w-full outline-none"
+                className="bg-gray-900 border border-gray-600 text-[11px] text-gray-200 rounded px-1.5 py-1 w-full outline-none focus:border-cyan-500 truncate"
                 value={assignedNode === null ? 'OFF' : assignedNode.toString()}
                 onChange={(e) => handleChannelChange(i, e.target.value)}
               >
-                <option value="OFF">Apagado</option>
+                <option value="OFF">-- Desactivado --</option>
                 {allNodes.map(n => (
                   <option key={n} value={n}>
                     {waveformData.nodeLabels[n] ?? `Nodo ${n}`}
                   </option>
                 ))}
               </select>
+
+              {/* Real-time Measurements */}
+              {metrics ? (
+                <div className="grid grid-cols-2 gap-x-1 text-[10px] font-mono text-gray-400 pt-1 border-t border-gray-800">
+                  <div>Vpp: <span className="text-gray-200 font-semibold">{formatVoltage(metrics.vpp)}</span></div>
+                  <div>Vmax: <span className="text-gray-200 font-semibold">{formatVoltage(metrics.max)}</span></div>
+                  <div>Vmin: <span className="text-gray-200 font-semibold">{formatVoltage(metrics.min)}</span></div>
+                  <div>f: <span className="text-gray-200 font-semibold">{metrics.freq > 0 ? `${metrics.freq.toFixed(0)}Hz` : '--'}</span></div>
+                </div>
+              ) : (
+                <div className="text-[10px] font-mono text-gray-500 italic pt-1 border-t border-gray-800">
+                  Sin señal conectada
+                </div>
+              )}
             </div>
           );
         })}

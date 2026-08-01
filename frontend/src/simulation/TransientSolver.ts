@@ -73,9 +73,16 @@ export function solveTransient(
 
     let solution: number[] | null = null;
 
+    const GMIN = 1e-12;
+
     for (let iter = 0; iter < 10; iter++) {
       const G: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
       const I: number[] = new Array(size).fill(0);
+
+      // Inyectar GMIN a tierra para todos los nodos para evitar singularidad en nodos flotantes
+      for (let r = 0; r < nNodes; r++) {
+        G[r][r] = GMIN;
+      }
 
       // Resistores
       for (const el of elements) {
@@ -144,11 +151,7 @@ export function solveTransient(
         if (nOut !== 0) G[nodeIdx(nOut)][opRow] += 1;
 
         if (state === 'LINEAR') {
-          // Solución al problema de osciladores que no arrancan en simulación transitoria:
-          // Circuitos como el Multivibrador Astable o el Oscilador de Wien inician en equilibrio perfecto (0V).
-          // En la vida real, el ruido térmico desestabiliza el circuito y arranca la oscilación.
-          // Aquí inyectamos un voltaje de offset artificial (Voffset = 1mV) para simular ese ruido inicial.
-          // Ecuación: Vout = A*(Vp - Vn + Voffset) => A*Vp - A*Vn - Vout = -A*Voffset
+          // Vout = A*(Vp - Vn + Voffset)
           if (nOut !== 0) G[opRow][nodeIdx(nOut)] = 1; else G[opRow][opRow] = 1;
           if (nInP !== 0) G[opRow][nodeIdx(nInP)] = -1e5;
           if (nInN !== 0) G[opRow][nodeIdx(nInN)] = 1e5;
@@ -165,26 +168,25 @@ export function solveTransient(
       solution = gaussianElimination(G, I);
       if (!solution) break; // Singular
 
-      // Convergencia de estados
+      // Transición directa de estados por voltaje diferencial
       let changed = false;
       for (let k = 0; k < opAmps.length; k++) {
         const el = opAmps[k];
         const state = currentOpAmpStates[el.id];
-        const [nInP, nInN, nOut] = el.nodes;
+        const [nInP, nInN] = el.nodes;
         
         const vP = nInP === 0 ? 0 : solution[nodeIdx(nInP)];
         const vN = nInN === 0 ? 0 : solution[nodeIdx(nInN)];
-        const vOut = nOut === 0 ? 0 : solution[nodeIdx(nOut)];
-        const linearOut = 1e5 * (vP - vN + 1e-3); // 1mV offset
+        const vDiff = vP - vN + 1e-3; // 1mV offset térmico de arranque
+        const linearOut = 1e5 * vDiff;
 
-        let nextState = state;
-        if (state === 'LINEAR') {
-          if (vOut > 15) nextState = 'SAT_HIGH';
-          else if (vOut < -15) nextState = 'SAT_LOW';
-        } else if (state === 'SAT_HIGH') {
-          if (linearOut < 15) nextState = 'LINEAR';
-        } else if (state === 'SAT_LOW') {
-          if (linearOut > -15) nextState = 'LINEAR';
+        let nextState: 'LINEAR' | 'SAT_HIGH' | 'SAT_LOW';
+        if (linearOut >= 15) {
+          nextState = 'SAT_HIGH';
+        } else if (linearOut <= -15) {
+          nextState = 'SAT_LOW';
+        } else {
+          nextState = 'LINEAR';
         }
 
         if (nextState !== state) {

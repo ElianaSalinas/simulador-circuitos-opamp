@@ -30,8 +30,10 @@ import { predefinedCircuits } from './library/circuits'
 const TIME_PRESETS = [
   { label: '1 ms', tEnd: 1e-3, tStep: 1e-6 },
   { label: '10 ms', tEnd: 10e-3, tStep: 10e-6 },
-  { label: '100 ms', tEnd: 100e-3, tStep: 100e-6 },
-  { label: '1 s', tEnd: 1, tStep: 1e-3 },
+  { label: '20 ms', tEnd: 20e-3, tStep: 10e-6 },
+  { label: '50 ms', tEnd: 50e-3, tStep: 25e-6 },
+  { label: '100 ms', tEnd: 100e-3, tStep: 50e-6 },
+  { label: '1 s', tEnd: 1, tStep: 500e-6 },
 ];
 
 const App: React.FC = () => {
@@ -47,7 +49,7 @@ const App: React.FC = () => {
   const circuitId = useSelector((state: RootState) => state.circuit.circuitId)
   const circuitName = useSelector((state: RootState) => state.circuit.circuitName)
 
-  const [selectedPreset, setSelectedPreset] = useState(1) // 10ms default
+  const [selectedPreset, setSelectedPreset] = useState(2) // 20ms default
   const [activeTab, setActiveTab] = useState<'dc' | 'transient'>('dc')
   const [showAuthModal, setShowAuthModal] = useState(false)
   const [showCircuitManager, setShowCircuitManager] = useState(false)

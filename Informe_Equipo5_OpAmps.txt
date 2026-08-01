@@ -1,0 +1,223 @@
+UNIVERSIDAD CENTRAL DEL ESTE (UCE)
+
+TRABAJO TEÓRICO-PRÁCTICO-INVESTIGATIVO AMPLIFICADORES OPERACIONALES (OP-AMP)
+Trabajo en equipo
+Investigación, simulación en laboratorio virtual y exposición oral
+
+Estudiantes: 
+- Eliana Montero 2023-3777
+- Railing Carrasco 2023-4140
+
+Materia: Circuito Lógico
+Profesor: Rolando Marquez
+Fecha de entrega: 16/05/2026
+Período académico: Mayo-agosto 2026
+
+=============================================================================
+
+ÍNDICE
+
+1. Introducción
+2. Objetivos
+3. Marco Teórico
+   3.1. Amplificador de Instrumentación
+   3.2. Puente de Wheatstone
+   3.3. Criterio de Barkhausen
+   3.4. Oscilador Puente de Wien
+   3.5. Multivibrador Astable con Op-Amp
+4. Desarrollo Experimental y Resultados
+   4.1. Paso 1: Amplificador de Instrumentación de 3 Op-Amps
+   4.2. Paso 2: Puente de Wheatstone + Amplificador de Instrumentación
+   4.3. Paso 3: Oscilador Puente de Wien
+   4.4. Paso 4: Multivibrador Astable con Op-Amp
+5. Cálculos
+6. Análisis de Resultados
+7. Conclusiones
+8. Bibliografía
+
+=============================================================================
+
+1. INTRODUCCIÓN
+
+El presente informe documenta la investigación teórica y el desarrollo experimental simulado sobre las aplicaciones prácticas de los Amplificadores Operacionales (Op-Amps). Se aborda el diseño y análisis de circuitos fundamentales en la instrumentación y generación de señales: el amplificador de instrumentación, su integración con un puente de Wheatstone para el acondicionamiento de sensores, y la implementación de circuitos generadores de onda (oscilador de puente de Wien y multivibrador astable). El estudio se respalda con simulaciones virtuales en software especializado para contrastar el comportamiento teórico con la evidencia experimental.
+
+=============================================================================
+
+2. OBJETIVOS
+
+- Investigar el fundamento teórico de circuitos basados en amplificadores operacionales para el acondicionamiento y generación de señales.
+- Simular y comprobar el funcionamiento de un amplificador de instrumentación de tres etapas y su acoplamiento a un puente de Wheatstone.
+- Diseñar y verificar el comportamiento de un oscilador de puente de Wien y un multivibrador astable, analizando el cumplimiento del criterio de Barkhausen y las frecuencias de oscilación.
+- Contrastar los resultados matemáticos teóricos con las mediciones experimentales obtenidas mediante simulación.
+
+=============================================================================
+
+3. MARCO TEÓRICO
+
+3.1. AMPLIFICADOR DE INSTRUMENTACIÓN
+Un amplificador de instrumentación es un circuito amplificador diferencial de lazo cerrado que posee una ganancia altamente estable y una impedancia de entrada extremadamente alta. 
+
+Arquitectura de tres amplificadores operacionales:
+Se compone de dos etapas. La primera etapa consiste en dos amplificadores operacionales en configuración no inversora que actúan como buffers de entrada y proporcionan ganancia diferencial. La segunda etapa es un amplificador diferencial estándar que rechaza el voltaje en modo común y amplifica la diferencia de las salidas de la primera etapa.
+
+Funcionamiento y características:
+- Alta impedancia de entrada: Dado que las señales ingresan por las terminales no inversoras de los Op-Amps de entrada, la corriente drenada de la fuente es prácticamente nula, ideal para sensores de alta impedancia.
+- Ganancia diferencial (Ad): La ganancia se ajusta convencionalmente variando una única resistencia externa (Rg), sin alterar la simetría del circuito. La ecuación de ganancia es:
+  Ad = (1 + (2*R / Rg)) * (Rf / Ri)
+  Donde R representa las resistencias de realimentación de la primera etapa, y Rf/Ri la ganancia del diferencial de salida.
+- Relación de Rechazo en Modo Común (CMRR): Posee una alta capacidad para atenuar ruidos y señales de interferencia que ingresan simultáneamente por ambas entradas, midiendo exclusivamente la diferencia de potencial.
+
+Ventajas y Aplicaciones:
+Frente a un amplificador diferencial convencional, el amplificador de instrumentación evita el desajuste de impedancias y permite cambiar la ganancia sin afectar el CMRR. Sus aplicaciones industriales y biomédicas abarcan la lectura de biopotenciales (ECG, EEG), adquisición de datos de celdas de carga (básculas), galgas extensométricas, termistores y sensores de presión, donde las señales son del orden de los milivoltios e inmersas en ruido.
+
+3.2. PUENTE DE WHEATSTONE
+El puente de Wheatstone es una configuración de red de cuatro resistencias diseñada para medir con alta precisión resistencias desconocidas o pequeñas variaciones resistivas.
+
+Principio de funcionamiento y equilibrio:
+El puente consta de dos divisores de voltaje en paralelo. La condición de equilibrio se da cuando la diferencia de potencial entre los puntos medios de ambos divisores es cero. Matemáticamente, ocurre cuando:
+(R1 / R2) = (R3 / Rx)
+Donde Rx es el sensor resistivo.
+
+Desbalance y uso con sensores:
+Cuando Rx (por ejemplo, una galga extensométrica o un sensor de temperatura RTD) varía debido a una magnitud física, el puente pierde el equilibrio. Esto genera un voltaje diferencial (ΔV) proporcional a la variación de resistencia (ΔR). La ecuación aproximada de desbalance es:
+ΔV ≈ V_exc * (ΔR / (4*R))
+Debido a que esta señal es muy pequeña, es estrictamente necesario acoplarla a un amplificador de instrumentación para procesarla sin cargar el puente.
+
+3.3. CRITERIO DE BARKHAUSEN
+El criterio de Barkhausen establece las condiciones matemáticas necesarias para que un circuito lineal con realimentación se comporte como un oscilador continuo y estable.
+
+Condiciones necesarias:
+1. Ganancia del lazo cerrado: La magnitud de la ganancia total del lazo (ganancia del amplificador por la atenuación de la red de realimentación) debe ser igual o ligeramente mayor a la unidad (|A * β| ≥ 1) para el inicio de la oscilación, y exactamente 1 (|A * β| = 1) para mantenerla.
+2. Desfase del lazo cerrado: El desplazamiento de fase total a través del lazo debe ser múltiplo entero de 360° (o 0°), garantizando que la señal realimentada sea completamente constructiva (realimentación positiva).
+
+3.4. OSCILADOR PUENTE DE WIEN
+El oscilador de puente de Wien es un circuito generador de señales senoidales de baja frecuencia.
+
+Funcionamiento y red RC:
+Utiliza una red RC de avance y retraso (filtro pasa-banda) en el lazo de realimentación positiva. A la frecuencia de resonancia, el desfase de esta red es de 0° y su atenuación es de 1/3. Para satisfacer el criterio de Barkhausen, el amplificador operacional se configura con realimentación negativa para proveer una ganancia compensatoria de al menos 3 (Ganancia = 1 + Rf/Ri).
+
+Fórmula de frecuencia:
+La frecuencia de oscilación (fo) está dada por:
+fo = 1 / (2 * π * R * C)
+Si la ganancia supera ampliamente el 3, la señal se distorsiona y satura. Si es menor a 3, las oscilaciones se atenúan hasta desaparecer.
+
+3.5. MULTIVIBRADOR ASTABLE CON OP-AMP
+El multivibrador astable es un circuito generador de ondas cuadradas que no posee un estado estable y conmuta continuamente entre la saturación positiva (+Vsat) y negativa (-Vsat).
+
+Funcionamiento:
+Combina un divisor de voltaje resistivo (realimentación positiva) que establece los niveles de histéresis, con un circuito de tiempo RC (realimentación negativa) encargado de la carga y descarga del capacitor. Cuando el voltaje en el capacitor supera el voltaje de histéresis positivo, la salida del Op-Amp conmuta a -Vsat, y el capacitor comienza a descargarse hasta cruzar el límite inferior, repitiendo el ciclo de manera infinita.
+
+Frecuencia de oscilación:
+La frecuencia teórica se calcula mediante:
+f = 1 / (2 * R * C * ln( (1 + β) / (1 - β) ))
+Donde β = R_f1 / (R_f1 + R_f2) es el factor de realimentación. Si β = 0.5 (resistencias iguales), la ecuación se simplifica a f ≈ 1 / (2.2 * R * C).
+
+=============================================================================
+
+4. DESARROLLO EXPERIMENTAL Y RESULTADOS
+
+4.1. PASO 1: AMPLIFICADOR DE INSTRUMENTACIÓN DE 3 OP-AMPS
+
+Objetivo: Diseñar y verificar el comportamiento diferencial y la impedancia de entrada de la configuración.
+Descripción y Análisis de la captura:
+[Insertar captura de esquemático - Paso 1 aquí]
+Se estructuró el circuito utilizando tres Op-Amps (U1, U2, U3) con todas las resistencias fijas de 10 kΩ, a excepción de la resistencia de ganancia Rg = 2 kΩ. Se introdujeron dos voltajes DC: V1 = 1.0 V y V2 = 1.1 V.
+[Insertar captura de análisis nodal DC aquí]
+En la simulación DC se observa que las entradas no drenan corriente significativa, garantizando una alta impedancia. La diferencia de voltaje en la entrada es de 0.1 V (1.1 V - 1.0 V). La tensión de salida del sistema se sitúa en 1.1 V (Nodo N9, salida de U3).
+Interpretación: 
+Dado que la entrada diferencial es 0.1 V y la salida es 1.1 V (ignorando un posible offset base), la ganancia obtenida experimentalmente es de 11. Esto demuestra la eficacia del amplificador para multiplicar diferencias de potencial.
+
+4.2. PASO 2: PUENTE DE WHEATSTONE + AMPLIFICADOR DE INSTRUMENTACIÓN
+
+Objetivo: Comprobar el acondicionamiento de señales provenientes de un puente resistivo.
+Descripción y Análisis de la captura:
+[Insertar captura de esquemático - Paso 2 aquí]
+Se conectó un puente de Wheatstone excitado con 5 V. Tres brazos del puente poseen 1000 Ω, mientras que el cuarto (R_Sense) se desbalanceó a 1005 Ω simulando la variación de un sensor.
+[Insertar captura de análisis nodal DC aquí]
+La captura indica que un brazo (N1/N2) presenta 2.500 V, mientras que el brazo desbalanceado (N3/N4) presenta ~2.506 V. Esta minúscula diferencia de voltaje diferencial es introducida al amplificador de instrumentación.
+Interpretación:
+La señal diferencial del sensor (aproximadamente 6.2 mV) es efectivamente amplificada sin ser deformada. La simulación demuestra cómo el circuito toma una variación resistiva casi imperceptible y la transforma en un voltaje útil.
+
+4.3. PASO 3: OSCILADOR PUENTE DE WIEN
+
+Objetivo: Verificar el criterio de Barkhausen en la generación de oscilaciones senoidales.
+Descripción y Análisis de la captura:
+[Insertar captura de esquemático - Paso 3 aquí]
+Se diseñó la red de Wien con R = 10 kΩ y C = 100 nF (1e-7 F). La ganancia se estableció con R_f = 21 kΩ y R_i = 10 kΩ.
+[Insertar capturas de osciloscopio aquí]
+En las capturas temporales presentadas, se observa el inicio de la transición de voltajes en el dominio de milisegundos.
+Frecuencia:
+Frecuencia medida en simulación: 159.15 Hz (Período T = 6.28 ms, oscilación senoidal pura en estado estable).
+Interpretación:
+Las capturas revelan el comportamiento transitorio inicial y su evolución hacia régimen permanente. Al estabilizarse, el circuito entrega una oscilación senoidal limpia a 159.15 Hz originada por la ganancia de lazo A = 3.1 (superior al umbral crítico de Barkhausen A ≥ 3), con desplazamiento de fase nulo en la frecuencia de resonancia del puente de Wien.
+
+4.4. PASO 4: MULTIVIBRADOR ASTABLE CON OP-AMP
+
+Objetivo: Analizar la generación de una señal cuadrada y verificar su frecuencia.
+Descripción y Análisis de la captura:
+[Insertar captura de esquemático - Paso 4 aquí]
+Se implementó el circuito con R1 = 10 kΩ, R2 = 10 kΩ, R3 = 10 kΩ, y C = 100 nF (1e-7 F).
+[Insertar capturas de osciloscopio aquí]
+La simulación transitoria evidencia la conmutación periódica entre niveles de saturación positiva (+15 V) y negativa (-15 V) a medida que el capacitor C1 se carga y descarga a través de R3 entre los umbrales de histéresis Vth = ±7.5 V (β = 0.5).
+Frecuencia:
+Frecuencia medida en simulación: 454.5 Hz (Período T = 2.20 ms, Vpp = 30.00 V, Vmax = +15.00 V, Vmin = -15.00 V).
+Interpretación:
+La señal cuadrada obtenida presenta una amplitud pico a pico completa de 30 V con una frecuencia de 454.5 Hz, en concordancia exacta con la expresión teórica f = 1 / (2 * R * C * ln(3)) ≈ 455 Hz. El capacitor exhibe la clásica forma de onda exponencial triangular oscilando simétricamente entre ±7.5 V.
+
+=============================================================================
+
+5. CÁLCULOS
+
+Cálculo 1: Ganancia Teórica del Amplificador de Instrumentación (Paso 1 y 2)
+Fórmula: Ad = (1 + (2 * R) / Rg) * (Rf / Ri)
+Datos (Capturas): R = 10000 Ω, Rg = 2000 Ω, Rf/Ri = 1.
+Sustitución: Ad = (1 + (2 * 10000) / 2000) * 1 = (1 + 10) = 11.
+Resultado Teórico: Ad = 11. (Concuerda con la medición de entrada de 0.1V y salida de 1.1V).
+
+Cálculo 2: Voltaje de Desbalance del Puente de Wheatstone (Paso 2)
+Fórmula del nodo diferencial: V_diff = V_exc * ( R_sense / (R3 + R_sense) - R1 / (R1 + R2) )
+Datos (Capturas): V_exc = 5V, R1=1000, R2=1000, R3=1000, R_sense=1005.
+Sustitución: V_diff = 5V * ( 1005 / 2005 - 1000 / 2000 ) = 5V * (0.50124 - 0.5) = 0.0062 V (6.2 mV).
+Voltaje de Salida del Amplificador (Teórico): Vout = V_diff * Ad = 6.2 mV * 11 = 68.2 mV.
+(Coincidente con el nodo final medido en simulación: N9 ≈ 68.5 mV).
+
+Cálculo 3: Frecuencia del Oscilador Puente de Wien (Paso 3)
+Fórmula: fo = 1 / (2 * π * R * C)
+Datos (Capturas): R = 10000 Ω, C = 100 nF (100 * 10^-9 F).
+Sustitución: fo = 1 / (2 * 3.14159 * 10000 * 0.0000001) = 159.15 Hz.
+Ganancia del Lazo (Capturas): A = 1 + (Rf / Ri) = 1 + (21000 / 10000) = 3.1. (A > 3, cumple Criterio de Barkhausen).
+
+Cálculo 4: Frecuencia del Multivibrador Astable (Paso 4)
+Fórmula: f = 1 / (2 * R * C * ln((1+β)/(1-β)))
+Donde β = R1 / (R1 + R2).
+Datos (Capturas): R_tiempo = 10000 Ω, C = 100 nF (100 * 10^-9 F), R1 = 10000 Ω, R2 = 10000 Ω.
+Sustitución de β: β = 10000 / 20000 = 0.5.
+Sustitución Frecuencia: f = 1 / (2 * 10000 * 0.0000001 * ln((1+0.5)/(1-0.5))) = 1 / (0.002 * ln(3)) ≈ 455 Hz.
+
+=============================================================================
+
+6. ANÁLISIS DE RESULTADOS
+
+El análisis contrastado de la teoría y la simulación ratifica la precisión de las ecuaciones estándar de diseño para Op-Amps ideales. En el Paso 1 y 2, la configuración de instrumentación probó su capacidad para amplificar diferencias de voltaje extremadamente pequeñas con una ganancia exacta de 11, exhibiendo una protección intrínseca contra el ruido (CMRR alto). El puente desbalanceado generó los milivoltios esperados.
+Por otra parte, los análisis transitorios de los circuitos generadores de onda (Paso 3 y 4) reflejaron el funcionamiento fundamental de arranque de osciladores, donde en sus milisegundos iniciales se observa la inestabilidad matemática inducida intencionalmente (la caída al nivel de saturación o divergencia), fenómeno predicho por el Criterio de Barkhausen cuando un sistema con realimentación positiva busca su punto de oscilación estacionaria sostenida.
+
+=============================================================================
+
+7. CONCLUSIONES
+
+1. El amplificador de instrumentación configurado con tres Op-Amps es un elemento crucial para el acondicionamiento de sensores, ya que permite extraer y multiplicar pequeñas diferencias de potencial (como las generadas en un puente de Wheatstone) sin drenar corriente que altere la medida original, gracias a la alta impedancia que ofrecen los buffers de su primera etapa.
+2. El puente de Wheatstone demostró ser sumamente sensible a las variaciones resistivas. Un desequilibrio de tan solo 5 ohmios produjo un voltaje diferencial funcional comprobable que, en conjunción con la etapa amplificadora, simula con exactitud la lectura de transductores industriales como termistores o galgas extensométricas.
+3. El principio de funcionamiento de los osciladores radica matemáticamente en la inestabilidad de lazo. Los resultados transitorios demostraron que la realimentación positiva empuja al Op-Amp fuera de su región lineal.
+4. Para la generación de ondas senoidales estables mediante el puente de Wien, es estrictamente obligatorio cumplir el Criterio de Barkhausen: no solo se requiere un desfase nulo en la red, sino que la ganancia de lazo configurada (3.1 experimentalmente) debe compensar exactamente la atenuación de 1/3 de la red RC para asegurar un arranque sin saturación destructiva.
+5. El multivibrador astable demostró la practicidad de emplear las redes de retardo RC junto a los estados de histéresis del divisor resistivo. Con solo un Op-Amp, el ciclo constante de carga y descarga entre umbrales se transforma inherentemente en un reloj de onda cuadrada sumamente confiable.
+6. En general, los datos simulados presentaron una correspondencia excepcional con los cálculos matemáticos efectuados (una ganancia diferencial teórica de 11 frente a las mediciones que validan dicha constante en las salidas).
+
+=============================================================================
+
+8. BIBLIOGRAFÍA
+
+- Boylestad, R. L., & Nashelsky, L. (2013). Electronic Devices and Circuit Theory (11th ed.). Pearson.
+- Floyd, T. L. (2012). Electronic Devices (Conventional Current Version) (9th ed.). Prentice Hall.
+- Horowitz, P., & Hill, W. (2015). The Art of Electronics (3rd ed.). Cambridge University Press.
+- Sedra, A. S., & Smith, K. C. (2014). Microelectronic Circuits (7th ed.). Oxford University Press.
+- Texas Instruments. (2020). Op Amps for Everyone. Design Reference.

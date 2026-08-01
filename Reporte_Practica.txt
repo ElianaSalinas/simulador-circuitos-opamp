@@ -1,0 +1,57 @@
+REPORTE DE PRÁCTICA - SIMULACIÓN DE CIRCUITOS ANALÓGICOS
+
+Autor/Cuenta: stephaniamonttero84@gmail.com
+Ubicación de almacenamiento: Carpeta "Mis Circuitos"
+Estado General: Todos los archivos almacenados correctamente.
+
+--- RESUMEN DE PROYECTOS SIMULADOS ---
+
+1. Amplificador de Instrumentación (01 - Amplificador de Instrumentación)
+- Estado: Simulado y guardado exitosamente.
+- Componentes y valores: 
+  * 3x Amplificadores Operacionales (modelo ideal equivalente a LM358/TL081)
+  * R1, R2, R3, R4, R5, R6 = 10kΩ
+  * Rg = 2kΩ
+  * Fuentes de voltaje DC (V1 = 1V, V2 = 1.1V)
+- Resultados (Teórico vs Simulado):
+  * Ganancia diferencial teórica de la 1ra etapa: 1 + (20k/2k) = 11.
+  * Tensión diferencial de entrada: 0.1V
+  * Salida medida simulada: 1.1V (Coincide con el cálculo teórico 0.1V * 11).
+  * Impedancia de entrada: Alta (corriente de entrada ≈ 0 en los terminales +).
+
+2. Puente Wheatstone con Amp. Instrumentación (02 - Puente Wheatstone con Amplificador de Instrumentación)
+- Estado: Simulado y guardado exitosamente.
+- Componentes y valores:
+  * 4x Resistencias de 1kΩ para el puente (una de ellas desbalanceada a 1.01kΩ para emular variación de sensor resistivo).
+  * Amplificador de Instrumentación acoplado (Mismos valores que el Proyecto 1).
+  * Fuente de alimentación del puente = 5V.
+- Resultados:
+  * El puente balanceado arrojaba 0V de diferencia.
+  * Al desbalancear el sensor, se generó una pequeña diferencia de voltaje diferencial en el puente.
+  * El amplificador de instrumentación tomó esa pequeña diferencia, amplificándola correctamente por el factor establecido.
+
+3. Oscilador Puente de Wien (03 - Oscilador Puente de Wien)
+- Estado: Simulado y guardado exitosamente.
+- Componentes y valores:
+  * 1x Amplificador Operacional
+  * Red RC simétrica: R = 10kΩ, C = 100nF (1e-7 F)
+  * Resistencias de realimentación negativa: Rf = 21kΩ, Ri = 10kΩ (Ganancia de lazo = 1 + 21/10 = 3.1 para asegurar arranque y sostenimiento).
+- Resultados (Teórico vs Simulado):
+  * Frecuencia Teórica: f = 1 / (2 * π * R * C) = 1 / (2 * 3.1416 * 10k * 100nF) = 159.15 Hz.
+  * Frecuencia Simulada: ~159 Hz (Medida visualmente en el panel del osciloscopio).
+  * Forma de onda: Senoidal estable tras superar la etapa transitoria de arranque.
+
+4. Multivibrador Astable con Op-Amp (04 - Multivibrador Astable con Op-Amp)
+- Estado: Simulado y guardado exitosamente.
+- Componentes y valores:
+  * 1x Amplificador Operacional
+  * Red RC para carga/descarga: R = 10kΩ, C = 1µF
+  * Realimentación positiva (divisor de tensión): R1 = 10kΩ, R2 = 10kΩ.
+- Resultados (Teórico vs Simulado):
+  * Umbrales teóricos (Beta): 0.5 (mitad del voltaje de saturación).
+  * Frecuencia Teórica: f ≈ 1 / (2 * R * C * ln(3)) ≈ 45.5 Hz.
+  * Frecuencia Simulada: ~45 Hz.
+  * Forma de onda: Cuadrada continua (alternando constantemente entre estados de saturación positivo y negativo).
+
+--- CONCLUSIÓN ---
+Todos los proyectos (01, 02, 03 y 04) han sido diseñados, ensamblados y simulados comprobando la integridad de las señales a través de los análisis Transitorio y DC. Los resultados simulados (voltajes, ganancias y frecuencias) concuerdan con la fundamentación matemática teórica. Se ha confirmado la ausencia de errores de conexión. Cada uno de los circuitos ha quedado almacenado sin problemas bajo la cuenta de stephaniamonttero84@gmail.com en su respectiva sección de la carpeta "Mis Circuitos".

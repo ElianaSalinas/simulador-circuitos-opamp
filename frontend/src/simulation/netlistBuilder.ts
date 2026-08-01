@@ -79,19 +79,26 @@ export function buildNetlist(
 
   // Build netlist elements
   const elements: NetlistElement[] = [];
+  // Map node numbers to their connected component pins for rich labeling
+  const nodePinsMap = new Map<number, string[]>();
 
   for (const comp of components) {
+    const label = comp.label || comp.id;
     switch (comp.type) {
       case 'Resistor': {
         const n1 = getNode(comp.id, 'left');
         const n2 = getNode(comp.id, 'right');
         elements.push({ id: comp.id, type: 'R', nodes: [n1, n2], value: comp.value ?? 1000, label: comp.label });
+        if (n1 !== 0) (nodePinsMap.get(n1) ?? (nodePinsMap.set(n1, []), nodePinsMap.get(n1)!)).push(label);
+        if (n2 !== 0) (nodePinsMap.get(n2) ?? (nodePinsMap.set(n2, []), nodePinsMap.get(n2)!)).push(label);
         break;
       }
       case 'Capacitor': {
         const n1 = getNode(comp.id, 'left');
         const n2 = getNode(comp.id, 'right');
         elements.push({ id: comp.id, type: 'C', nodes: [n1, n2], value: comp.value ?? 1e-6, label: comp.label });
+        if (n1 !== 0) (nodePinsMap.get(n1) ?? (nodePinsMap.set(n1, []), nodePinsMap.get(n1)!)).push(label);
+        if (n2 !== 0) (nodePinsMap.get(n2) ?? (nodePinsMap.set(n2, []), nodePinsMap.get(n2)!)).push(label);
         break;
       }
       case 'Voltage': {
@@ -108,25 +115,34 @@ export function buildNetlist(
           amplitude: comp.amplitude,
           frequency: comp.frequency
         });
+        if (nPos !== 0) (nodePinsMap.get(nPos) ?? (nodePinsMap.set(nPos, []), nodePinsMap.get(nPos)!)).push(`${label}(+)`);
+        if (nNeg !== 0) (nodePinsMap.get(nNeg) ?? (nodePinsMap.set(nNeg, []), nodePinsMap.get(nNeg)!)).push(`${label}(-)`);
         break;
       }
       case 'OpAmp': {
         const nInP = getNode(comp.id, 'in+');
         const nInN = getNode(comp.id, 'in-');
         const nOut = getNode(comp.id, 'out');
-        // Ideal Op-Amp: modeled as VCVS Vout = A*(Vin+ - Vin-)
-        // Solución a matrices singulares por pines de alimentación desconectados (V+, V-):
-        // Anteriormente, si el usuario dejaba V+ y V- sin conectar, se creaban nodos flotantes 
-        // sin conductancia que generaban filas de ceros en la matriz (error matemático instantáneo).
-        // Al ignorar estos pines y no asignarles ID de nodo en el modelo ideal, evitamos el error.
         elements.push({ id: comp.id, type: 'OpAmp', nodes: [nInP, nInN, nOut], value: 1e6, label: comp.label });
+        if (nInP !== 0) (nodePinsMap.get(nInP) ?? (nodePinsMap.set(nInP, []), nodePinsMap.get(nInP)!)).push(`${label}.in+`);
+        if (nInN !== 0) (nodePinsMap.get(nInN) ?? (nodePinsMap.set(nInN, []), nodePinsMap.get(nInN)!)).push(`${label}.in-`);
+        if (nOut !== 0) (nodePinsMap.get(nOut) ?? (nodePinsMap.set(nOut, []), nodePinsMap.get(nOut)!)).push(`${label}.out`);
         break;
       }
       case 'Ground': {
-        // Already handled by node 0 assignment
         getNode(comp.id, 'gnd');
         break;
       }
+    }
+  }
+
+  // Populate formatted labels: N1 (U1.out, R1, R3)
+  for (let n = 1; n < nodeCounter; n++) {
+    const pins = Array.from(new Set(nodePinsMap.get(n) || []));
+    if (pins.length > 0) {
+      nodeLabels[n] = `N${n} (${pins.join(', ')})`;
+    } else {
+      nodeLabels[n] = `N${n}`;
     }
   }
 
