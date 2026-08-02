@@ -1,15 +1,16 @@
 /**
  * TransientSolver.ts
- * Análisis transitorio usando MNA + Backward Euler para capacitores.
+ * Análisis transitorio usando MNA + Integración Trapezoidal para capacitores.
  *
- * Modelo de capacitor (Companion Model - Backward Euler):
- *   I_C(t+Δt) = C/Δt * V_C(t+Δt) - C/Δt * V_C(t)
+ * Modelo de capacitor (Companion Model - Trapezoidal Integration):
+ *   i_C(n) = (2C/Δt) * v_C(n) - [ (2C/Δt) * v_C(n-1) + i_C(n-1) ]
  *
  * Se modela como:
- *   - Resistencia equivalente: R_eq = Δt / C
- *   - Fuente de corriente:     I_eq = C/Δt * V_C(t)  (inyectada al nodo +)
+ *   - Conductancia equivalente: G_eq = 2C / Δt
+ *   - Fuente de corriente:      I_eq = G_eq * v_C(n-1) + i_C(n-1)
  *
- * En cada paso de tiempo se resuelve la matriz MNA modificada.
+ * La regla trapezoidal conserva la energía armónica (|A_num| = 1.0) sin disipación
+ * artificial, garantizando oscilaciones senoidales y cuadradas puras y estables.
  */
 
 import { gaussianElimination } from './MNASolver';
@@ -51,9 +52,16 @@ export function solveTransient(
   const opAmps = elements.filter(e => e.type === 'OpAmp');
   const capacitors = elements.filter(e => e.type === 'C');
 
-  // Estado inicial de capacitores (voltaje = 0)
+  // Estado de capacitores (voltajes y corrientes históricas)
   const capVoltages: Record<string, number> = {};
-  capacitors.forEach(c => { capVoltages[c.id] = 0; });
+  const capCurrents: Record<string, number> = {};
+
+  // Para circuitos autónomos (osciladores sin fuentes independientes), inyectar perturbación inicial
+  const isAutonomous = voltageSources.length === 0 && capacitors.length > 0;
+  capacitors.forEach((c, idx) => {
+    capVoltages[c.id] = isAutonomous && idx === 0 ? 0.5 : 0;
+    capCurrents[c.id] = 0;
+  });
 
   // Resultados
   const timePoints: number[] = [];
@@ -66,16 +74,20 @@ export function solveTransient(
   const currentOpAmpStates: Record<string, 'LINEAR'|'SAT_HIGH'|'SAT_LOW'> = {};
   opAmps.forEach(el => { currentOpAmpStates[el.id] = 'LINEAR'; });
 
-  const solveStep = (capState: Record<string, number>, t: number): number[] | null => {
+  const solveStep = (
+    cVolt: Record<string, number>,
+    cCurr: Record<string, number>,
+    t: number
+  ): number[] | null => {
     const nExtra = voltageSources.length + opAmps.length;
     const size = nNodes + nExtra;
     if (size === 0) return null;
 
     let solution: number[] | null = null;
-
     const GMIN = 1e-12;
+    const VSAT = 14.5;
 
-    for (let iter = 0; iter < 10; iter++) {
+    for (let iter = 0; iter < 12; iter++) {
       const G: number[][] = Array.from({ length: size }, () => new Array(size).fill(0));
       const I: number[] = new Array(size).fill(0);
 
@@ -97,19 +109,19 @@ export function solveTransient(
         }
       }
 
-      // Capacitores → Companion model (Backward Euler)
+      // Capacitores → Companion model (Integración Trapezoidal)
       for (const el of capacitors) {
         const [a, b] = el.nodes;
-        const geq = el.value / dt;     // C/Δt
-        const ieq = geq * capState[el.id]; // corriente equivalente
-        // Resistencia equivalente
+        const geq = (2 * el.value) / dt; // 2C/Δt
+        const ieq = geq * (cVolt[el.id] ?? 0) + (cCurr[el.id] ?? 0); // corriente equivalente
+
         if (a !== 0) G[nodeIdx(a)][nodeIdx(a)] += geq;
         if (b !== 0) G[nodeIdx(b)][nodeIdx(b)] += geq;
         if (a !== 0 && b !== 0) {
           G[nodeIdx(a)][nodeIdx(b)] -= geq;
           G[nodeIdx(b)][nodeIdx(a)] -= geq;
         }
-        // Fuente de corriente equivalente
+        // Inyección de corriente equivalente
         if (a !== 0) I[nodeIdx(a)] += ieq;
         if (b !== 0) I[nodeIdx(b)] -= ieq;
       }
@@ -142,7 +154,7 @@ export function solveTransient(
         I[vsRow] = v;
       });
 
-      // Op-Amps (PWL model con saturación)
+      // Op-Amps (PWL model con saturación simétrica)
       opAmps.forEach((el, k) => {
         const opRow = nNodes + voltageSources.length + k;
         const [nInP, nInN, nOut] = el.nodes;
@@ -151,24 +163,24 @@ export function solveTransient(
         if (nOut !== 0) G[nodeIdx(nOut)][opRow] += 1;
 
         if (state === 'LINEAR') {
-          // Vout = A*(Vp - Vn + Voffset)
+          // Vout = A*(Vp - Vn)
           if (nOut !== 0) G[opRow][nodeIdx(nOut)] = 1; else G[opRow][opRow] = 1;
           if (nInP !== 0) G[opRow][nodeIdx(nInP)] = -1e5;
           if (nInN !== 0) G[opRow][nodeIdx(nInN)] = 1e5;
-          I[opRow] = 100; // 1mV offset para arrancar osciladores (1e5 * 1e-3)
+          I[opRow] = 0;
         } else if (state === 'SAT_HIGH') {
           if (nOut !== 0) G[opRow][nodeIdx(nOut)] = 1; else G[opRow][opRow] = 1;
-          I[opRow] = 15; // +Vsat
+          I[opRow] = VSAT; // +Vsat
         } else if (state === 'SAT_LOW') {
           if (nOut !== 0) G[opRow][nodeIdx(nOut)] = 1; else G[opRow][opRow] = 1;
-          I[opRow] = -15; // -Vsat
+          I[opRow] = -VSAT; // -Vsat
         }
       });
 
       solution = gaussianElimination(G, I);
       if (!solution) break; // Singular
 
-      // Transición directa de estados por voltaje diferencial
+      // Transición de estados por voltaje diferencial
       let changed = false;
       for (let k = 0; k < opAmps.length; k++) {
         const el = opAmps[k];
@@ -177,13 +189,12 @@ export function solveTransient(
         
         const vP = nInP === 0 ? 0 : solution[nodeIdx(nInP)];
         const vN = nInN === 0 ? 0 : solution[nodeIdx(nInN)];
-        const vDiff = vP - vN + 1e-3; // 1mV offset térmico de arranque
-        const linearOut = 1e5 * vDiff;
+        const linearOut = 1e5 * (vP - vN);
 
         let nextState: 'LINEAR' | 'SAT_HIGH' | 'SAT_LOW';
-        if (linearOut >= 15) {
+        if (linearOut >= VSAT) {
           nextState = 'SAT_HIGH';
-        } else if (linearOut <= -15) {
+        } else if (linearOut <= -VSAT) {
           nextState = 'SAT_LOW';
         } else {
           nextState = 'LINEAR';
@@ -206,7 +217,7 @@ export function solveTransient(
     const t = tStart + step * dt;
     timePoints.push(parseFloat(t.toFixed(9)));
 
-    const sol = solveStep(capVoltages, t);
+    const sol = solveStep(capVoltages, capCurrents, t);
     if (!sol) {
       return { success: false, error: `No se pudo resolver en t=${t.toExponential(2)}s. Verifica el circuito.` };
     }
@@ -217,12 +228,20 @@ export function solveTransient(
       nodeWaveforms[n].push(sol[n - 1] ?? 0);
     }
 
-    // Actualizar voltajes de capacitores para el siguiente paso
+    // Actualizar estados y corrientes de capacitores (Trapezoidal companion update)
     for (const cap of capacitors) {
       const [a, b] = cap.nodes;
       const va = a !== 0 ? (sol[nodeIdx(a)] ?? 0) : 0;
       const vb = b !== 0 ? (sol[nodeIdx(b)] ?? 0) : 0;
-      capVoltages[cap.id] = va - vb;
+      const vNew = va - vb;
+      const vOld = capVoltages[cap.id] ?? 0;
+      const iOld = capCurrents[cap.id] ?? 0;
+
+      const geq = (2 * cap.value) / dt;
+      const iNew = geq * (vNew - vOld) - iOld;
+
+      capVoltages[cap.id] = vNew;
+      capCurrents[cap.id] = iNew;
     }
   }
 

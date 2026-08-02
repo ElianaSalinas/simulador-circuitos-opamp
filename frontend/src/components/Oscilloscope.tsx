@@ -3,9 +3,9 @@ import { useSelector, useDispatch } from 'react-redux';
 import type { RootState } from '../store';
 import { toggleOscilloscope } from '../store/simulationSlice';
 
-const CHANNEL_COLORS = ['#38bdf8', '#4ade80', '#fbbf24', '#f472b6']; // Blue, Green, Yellow, Pink
-const GRID_COLOR = 'rgba(255,255,255,0.07)';
-const AXIS_COLOR = 'rgba(255,255,255,0.2)';
+const CHANNEL_COLORS = ['#38bdf8', '#4ade80', '#fbbf24', '#f472b6']; // Cyan, Green, Yellow, Pink
+const GRID_COLOR = 'rgba(255, 255, 255, 0.07)';
+const AXIS_COLOR = 'rgba(255, 255, 255, 0.2)';
 
 const formatTime = (s: number): string => {
   if (s >= 1) return `${s.toFixed(2)} s`;
@@ -22,12 +22,15 @@ const formatVoltage = (v: number): string => {
 
 const computeMetrics = (timePoints: number[], wf: number[] | undefined) => {
   if (!wf || wf.length === 0) return null;
-  let min = Infinity, max = -Infinity;
+  let min = Infinity, max = -Infinity, sumSquares = 0;
   for (let i = 0; i < wf.length; i++) {
-    if (wf[i] < min) min = wf[i];
-    if (wf[i] > max) max = wf[i];
+    const val = wf[i];
+    if (val < min) min = val;
+    if (val > max) max = val;
+    sumSquares += val * val;
   }
   const vpp = max - min;
+  const vrms = Math.sqrt(sumSquares / wf.length);
   const mid = (max + min) / 2;
 
   let crossings = 0;
@@ -47,7 +50,7 @@ const computeMetrics = (timePoints: number[], wf: number[] | undefined) => {
     freq = (crossings - 1) / (lastT - firstT);
   }
 
-  return { min, max, vpp, freq };
+  return { min, max, vpp, vrms, freq };
 };
 
 const Oscilloscope: React.FC = () => {
@@ -58,29 +61,37 @@ const Oscilloscope: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [hoveredTime, setHoveredTime] = useState<number | null>(null);
   const [cursorX, setCursorX] = useState<number | null>(null);
-  
-  // Array of node IDs assigned to CH1, CH2, CH3, CH4
+
+  // Channels assignment
   const [channels, setChannels] = useState<(number | null)[]>([null, null, null, null]);
+
+  // Live Continuous Sweep & Playback controls
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [speedMultiplier, setSpeedMultiplier] = useState(1);
+  const [sweepProgress, setSweepProgress] = useState(0); // 0 to 1
+
+  // Draggable window state
+  const [windowPos, setWindowPos] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isDraggingWindow, setIsDraggingWindow] = useState(false);
+  const [dragOffset, setDragOffset] = useState<{ x: number; y: number }>({ x: 0, y: 0 });
+  const [isMaximized, setIsMaximized] = useState(false);
 
   // Smart Auto-assign nodes when waveformData is loaded or changed
   useEffect(() => {
     if (waveformData) {
       const nodes = Object.keys(waveformData.nodeWaveforms)
         .map(Number)
-        .filter(n => n !== 0);
+        .filter((n) => n !== 0);
 
-      // Prioritize output nodes and key feedback points
       const scoredNodes = [...nodes].sort((a, b) => {
         const labelA = waveformData.nodeLabels[a] || '';
         const labelB = waveformData.nodeLabels[b] || '';
-        
         const getScore = (label: string) => {
           if (label.includes('.out') || label.includes('out')) return 3;
           if (label.includes('.in-') || label.includes('in-') || label.includes('C1')) return 2;
           if (label.includes('.in+') || label.includes('in+')) return 1;
           return 0;
         };
-
         return getScore(labelB) - getScore(labelA);
       });
 
@@ -88,15 +99,35 @@ const Oscilloscope: React.FC = () => {
         scoredNodes[0] ?? null,
         scoredNodes[1] ?? null,
         scoredNodes[2] ?? null,
-        scoredNodes[3] ?? null
+        scoredNodes[3] ?? null,
       ]);
     }
   }, [waveformData]);
 
-  const PADDING = { top: 20, right: 20, bottom: 40, left: 60 };
-
+  // 60 FPS Sweep Animation Loop
   useEffect(() => {
-    if (!waveformData || !canvasRef.current) return;
+    if (!isPlaying || !oscilloscopeVisible) return;
+
+    let frameId: number;
+    let lastTime = performance.now();
+
+    const loop = (time: number) => {
+      const delta = (time - lastTime) / 1000;
+      lastTime = time;
+
+      setSweepProgress((prev) => (prev + delta * 0.4 * speedMultiplier) % 1);
+      frameId = requestAnimationFrame(loop);
+    };
+
+    frameId = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(frameId);
+  }, [isPlaying, speedMultiplier, oscilloscopeVisible]);
+
+  const PADDING = { top: 20, right: 20, bottom: 40, left: 65 };
+
+  // Canvas Drawing Effect
+  useEffect(() => {
+    if (!waveformData || !canvasRef.current || !oscilloscopeVisible) return;
 
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
@@ -107,25 +138,34 @@ const Oscilloscope: React.FC = () => {
     const plotW = W - PADDING.left - PADDING.right;
     const plotH = H - PADDING.top - PADDING.bottom;
 
-    // Clear
+    // Clear Canvas with phosphor CRT dark slate
     ctx.clearRect(0, 0, W, H);
-    ctx.fillStyle = '#0f172a'; // Slate 900
+    ctx.fillStyle = '#090d16';
     ctx.fillRect(0, 0, W, H);
 
     // Compute Y range across assigned channels
     let yMin = Infinity, yMax = -Infinity;
-    channels.forEach(ch => {
+    channels.forEach((ch) => {
       if (ch === null) return;
       const wf = waveformData.nodeWaveforms[ch];
       if (!wf) return;
-      wf.forEach(v => { if (v < yMin) yMin = v; if (v > yMax) yMax = v; });
+      wf.forEach((v) => {
+        if (v < yMin) yMin = v;
+        if (v > yMax) yMax = v;
+      });
     });
-    
-    if (!isFinite(yMin) || !isFinite(yMax)) { yMin = -5; yMax = 5; }
-    if (Math.abs(yMax - yMin) < 1e-9) { yMin -= 2; yMax += 2; }
+
+    if (!isFinite(yMin) || !isFinite(yMax)) {
+      yMin = -5;
+      yMax = 5;
+    }
+    if (Math.abs(yMax - yMin) < 1e-9) {
+      yMin -= 2;
+      yMax += 2;
+    }
 
     const yRange = yMax - yMin;
-    const yMargin = yRange * 0.1;
+    const yMargin = yRange * 0.12;
     yMin -= yMargin;
     yMax += yMargin;
     const yScale = plotH / (yMax - yMin);
@@ -136,7 +176,7 @@ const Oscilloscope: React.FC = () => {
     const tRange = tEnd - tStart;
     if (tRange <= 0) return;
 
-    // Draw Grid
+    // Grid lines
     ctx.beginPath();
     ctx.strokeStyle = GRID_COLOR;
     ctx.lineWidth = 1;
@@ -154,21 +194,21 @@ const Oscilloscope: React.FC = () => {
     }
     ctx.stroke();
 
-    // Zero axis
+    // 0V Axis
     if (0 >= yMin && 0 <= yMax) {
       const yZero = PADDING.top + plotH - (0 - yMin) * yScale;
       ctx.beginPath();
       ctx.strokeStyle = AXIS_COLOR;
-      ctx.setLineDash([5, 5]);
+      ctx.setLineDash([4, 4]);
       ctx.moveTo(PADDING.left, yZero);
       ctx.lineTo(W - PADDING.right, yZero);
       ctx.stroke();
       ctx.setLineDash([]);
     }
 
-    // Y labels
-    ctx.fillStyle = '#64748B'; // slate-500
-    ctx.font = '10px monospace';
+    // Y labels (Voltages)
+    ctx.fillStyle = '#64748b';
+    ctx.font = '10px JetBrains Mono, monospace';
     ctx.textAlign = 'right';
     ctx.textBaseline = 'middle';
     for (let i = 0; i <= H_LINES; i++) {
@@ -177,7 +217,7 @@ const Oscilloscope: React.FC = () => {
       ctx.fillText(formatVoltage(v), PADDING.left - 8, y);
     }
 
-    // X labels
+    // X labels (Time)
     ctx.textAlign = 'center';
     ctx.textBaseline = 'top';
     for (let i = 0; i <= V_LINES; i++) {
@@ -186,12 +226,12 @@ const Oscilloscope: React.FC = () => {
       ctx.fillText(formatTime(t), x, H - PADDING.bottom + 8);
     }
 
-    // Draw Waveforms
+    // Draw Channel Waveforms
     channels.forEach((nodeId, idx) => {
       if (nodeId === null) return;
       const wf = waveformData.nodeWaveforms[nodeId];
       if (!wf) return;
-      
+
       const color = CHANNEL_COLORS[idx];
       ctx.beginPath();
       ctx.strokeStyle = color;
@@ -205,57 +245,102 @@ const Oscilloscope: React.FC = () => {
         else ctx.lineTo(x, y);
       });
       ctx.stroke();
-      
-      // Glow effect
+
+      // Phosphor Glow Effect
       ctx.shadowColor = color;
       ctx.shadowBlur = 8;
       ctx.stroke();
       ctx.shadowBlur = 0;
     });
 
-    // Draw Cursor
+    // Continuous Live Sweep Line (Beam)
+    if (isPlaying) {
+      const sweepX = PADDING.left + sweepProgress * plotW;
+
+      // Glowing vertical sweep line
+      const gradient = ctx.createLinearGradient(sweepX - 25, 0, sweepX + 5, 0);
+      gradient.addColorStop(0, 'rgba(56, 189, 248, 0)');
+      gradient.addColorStop(0.85, 'rgba(56, 189, 248, 0.15)');
+      gradient.addColorStop(1, 'rgba(56, 189, 248, 0.9)');
+
+      ctx.fillStyle = gradient;
+      ctx.fillRect(sweepX - 25, PADDING.top, 25, plotH);
+
+      ctx.beginPath();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.shadowColor = '#38bdf8';
+      ctx.shadowBlur = 10;
+      ctx.moveTo(sweepX, PADDING.top);
+      ctx.lineTo(sweepX, H - PADDING.bottom);
+      ctx.stroke();
+      ctx.shadowBlur = 0;
+    }
+
+    // Static Hover Cursor
     if (cursorX !== null && hoveredTime !== null) {
       ctx.beginPath();
-      ctx.strokeStyle = '#FCD34D';
+      ctx.strokeStyle = '#fcd34d';
       ctx.lineWidth = 1;
       ctx.moveTo(cursorX, PADDING.top);
       ctx.lineTo(cursorX, H - PADDING.bottom);
       ctx.stroke();
 
-      // Draw values at cursor
       channels.forEach((nodeId, idx) => {
         if (nodeId === null) return;
         const wf = waveformData.nodeWaveforms[nodeId];
         if (!wf) return;
-        
+
         let closestIdx = 0;
         let minDiff = Infinity;
         tPts.forEach((t, i) => {
           const d = Math.abs(t - hoveredTime);
-          if (d < minDiff) { minDiff = d; closestIdx = i; }
+          if (d < minDiff) {
+            minDiff = d;
+            closestIdx = i;
+          }
         });
-        
+
         const v = wf[closestIdx];
         const y = PADDING.top + plotH - (v - yMin) * yScale;
-        
+
         ctx.fillStyle = CHANNEL_COLORS[idx];
         ctx.beginPath();
-        ctx.arc(cursorX, y, 4, 0, Math.PI * 2);
+        ctx.arc(cursorX, y, 4.5, 0, Math.PI * 2);
         ctx.fill();
-        ctx.strokeStyle = '#1E293B';
+        ctx.strokeStyle = '#0f172a';
         ctx.stroke();
-        
+
         ctx.textAlign = 'left';
-        ctx.font = 'bold 11px monospace';
+        ctx.font = 'bold 11px JetBrains Mono, monospace';
         ctx.fillText(`${formatVoltage(v)}`, cursorX + 8, y);
       });
     }
-
-  }, [waveformData, channels, hoveredTime, cursorX]);
+  }, [waveformData, channels, hoveredTime, cursorX, sweepProgress, isPlaying, oscilloscopeVisible]);
 
   if (!waveformData || !oscilloscopeVisible) return null;
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
+  // Window drag handlers
+  const handleMouseDownHeader = (e: React.MouseEvent) => {
+    if ((e.target as HTMLElement).tagName === 'BUTTON' || (e.target as HTMLElement).tagName === 'SELECT') return;
+    setIsDraggingWindow(true);
+    setDragOffset({
+      x: e.clientX - windowPos.x,
+      y: e.clientY - windowPos.y,
+    });
+  };
+
+  const handleMouseMoveWindow = (e: React.MouseEvent) => {
+    if (!isDraggingWindow) return;
+    setWindowPos({
+      x: e.clientX - dragOffset.x,
+      y: e.clientY - dragOffset.y,
+    });
+  };
+
+  const handleMouseUpWindow = () => setIsDraggingWindow(false);
+
+  const handleCanvasMouseMove = (e: React.MouseEvent<HTMLCanvasElement>) => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -272,7 +357,9 @@ const Oscilloscope: React.FC = () => {
     }
   };
 
-  const allNodes = Object.keys(waveformData.nodeWaveforms).map(Number).filter(n => n !== 0);
+  const allNodes = Object.keys(waveformData.nodeWaveforms)
+    .map(Number)
+    .filter((n) => n !== 0);
 
   const handleChannelChange = (idx: number, nodeIdStr: string) => {
     const newChannels = [...channels];
@@ -281,69 +368,139 @@ const Oscilloscope: React.FC = () => {
   };
 
   return (
-    <div className="absolute bottom-6 left-0 right-0 mx-auto w-[850px] bg-gray-900 rounded-xl border border-gray-700 shadow-2xl z-30 overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-gray-800 border-b border-gray-700">
+    <div
+      onMouseMove={handleMouseMoveWindow}
+      onMouseUp={handleMouseUpWindow}
+      style={{
+        transform: `translate(${windowPos.x}px, ${windowPos.y}px)`,
+      }}
+      className={`absolute bottom-6 left-0 right-0 mx-auto z-30 transition-shadow ${
+        isMaximized ? 'w-[96vw] max-w-[1200px]' : 'w-[880px]'
+      } bg-slate-950/95 backdrop-blur-xl rounded-2xl border border-slate-700/80 shadow-[0_20px_50px_rgba(0,0,0,0.8)] overflow-hidden select-none`}
+    >
+      {/* Draggable Header */}
+      <div
+        onMouseDown={handleMouseDownHeader}
+        className="flex items-center justify-between px-4 py-2.5 bg-slate-900 border-b border-slate-700/80 cursor-move"
+      >
         <div className="flex items-center gap-3">
-          <span className="text-xs font-bold text-gray-300 uppercase tracking-widest flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 inline-block animate-pulse"></span>
+          <span className="w-2.5 h-2.5 rounded-full bg-cyan-400 animate-pulse shadow-[0_0_8px_#38bdf8]"></span>
+          <span className="text-xs font-bold text-slate-200 uppercase tracking-wider font-mono">
             Osciloscopio Digital de 4 Canales
           </span>
+          <span className="px-2 py-0.5 text-[10px] font-semibold rounded bg-cyan-950 text-cyan-400 border border-cyan-800">
+            {isPlaying ? '● EN VIVO' : '❚❚ PAUSADO'}
+          </span>
         </div>
-        <div className="flex items-center gap-4">
+
+        {/* Top Controls: Play/Pause, Speed, Cursor time, Minimize */}
+        <div className="flex items-center gap-3">
+          {/* Live Play / Pause */}
+          <button
+            onClick={() => setIsPlaying(!isPlaying)}
+            className={`px-2.5 py-1 text-xs font-semibold rounded-lg border transition-all ${
+              isPlaying
+                ? 'bg-emerald-600/20 text-emerald-300 border-emerald-500/40 hover:bg-emerald-600/30'
+                : 'bg-amber-600/20 text-amber-300 border-amber-500/40 hover:bg-amber-600/30'
+            }`}
+          >
+            {isPlaying ? '⏸ Pausa' : '▶ Reanudar'}
+          </button>
+
+          {/* Speed Selector */}
+          <div className="flex items-center gap-1 bg-slate-800 rounded-lg p-0.5 border border-slate-700">
+            {[0.5, 1, 2].map((s) => (
+              <button
+                key={s}
+                onClick={() => setSpeedMultiplier(s)}
+                className={`px-2 py-0.5 text-[10px] font-mono font-bold rounded transition-colors ${
+                  speedMultiplier === s
+                    ? 'bg-cyan-600 text-white'
+                    : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                {s}x
+              </button>
+            ))}
+          </div>
+
+          {/* Cursor Time Display */}
           {hoveredTime !== null && (
-            <span className="text-xs font-mono text-yellow-400 bg-gray-900 px-2.5 py-1 rounded border border-gray-700">
+            <span className="text-xs font-mono text-yellow-400 bg-slate-900 px-2 py-1 rounded border border-slate-700">
               t = {formatTime(hoveredTime)}
             </span>
           )}
+
+          {/* Maximize Toggle */}
+          <button
+            onClick={() => setIsMaximized(!isMaximized)}
+            className="text-slate-400 hover:text-white text-xs px-2 py-1 rounded hover:bg-slate-800 transition-colors"
+          >
+            {isMaximized ? '🗗 Reducir' : '🗖 Expandir'}
+          </button>
+
+          {/* Close Button */}
           <button
             onClick={() => dispatch(toggleOscilloscope())}
-            className="text-gray-400 hover:text-white text-lg leading-none transition-colors"
-          >×</button>
+            className="w-6 h-6 flex items-center justify-center rounded-lg text-slate-400 hover:text-white hover:bg-rose-600/80 transition-colors"
+          >
+            ✕
+          </button>
         </div>
       </div>
 
-      {/* Canvas */}
-      <div className="bg-[#0f172a] p-1.5">
+      {/* Screen Canvas */}
+      <div className="bg-[#090d16] p-2">
         <canvas
           ref={canvasRef}
-          width={838}
-          height={280}
-          onMouseMove={handleMouseMove}
-          onMouseLeave={() => { setHoveredTime(null); setCursorX(null); }}
-          className="block w-full rounded"
+          width={isMaximized ? 1160 : 860}
+          height={isMaximized ? 320 : 250}
+          onMouseMove={handleCanvasMouseMove}
+          onMouseLeave={() => {
+            setHoveredTime(null);
+            setCursorX(null);
+          }}
+          className="block w-full rounded-lg"
           style={{ cursor: 'crosshair' }}
         />
       </div>
 
-      {/* Channel Config Panel & Real-time Metrics */}
-      <div className="grid grid-cols-4 px-4 py-3 bg-gray-800 border-t border-gray-700 gap-3">
+      {/* Channel Controls & Real-Time Telemetry Cards */}
+      <div className="grid grid-cols-4 px-3 py-2.5 bg-slate-900 border-t border-slate-700/80 gap-2.5">
         {[0, 1, 2, 3].map((i) => {
           const color = CHANNEL_COLORS[i];
           const assignedNode = channels[i];
           const wf = assignedNode !== null ? waveformData.nodeWaveforms[assignedNode] : undefined;
           const metrics = computeMetrics(waveformData.timePoints, wf);
-          
+
           return (
-            <div key={i} className="flex flex-col gap-1.5 p-2 bg-gray-900/60 rounded-lg border border-gray-700/60">
+            <div
+              key={i}
+              className="flex flex-col gap-1.5 p-2 bg-slate-950/70 rounded-xl border border-slate-800"
+            >
               <div className="flex items-center justify-between">
-                <span className="text-xs font-bold flex items-center gap-1.5" style={{ color }}>
+                <span className="text-xs font-bold font-mono flex items-center gap-1.5" style={{ color }}>
                   <span className="w-2 h-2 rounded-full" style={{ backgroundColor: color }}></span>
                   CH{i + 1}
                 </span>
-                {metrics && metrics.freq > 0 && (
-                  <span className="text-[10px] font-mono font-semibold text-emerald-400">
-                    {metrics.freq >= 1000 ? `${(metrics.freq / 1000).toFixed(2)} kHz` : `${metrics.freq.toFixed(1)} Hz`}
+                {metrics && metrics.freq > 0 ? (
+                  <span className="text-[10px] font-mono font-bold text-emerald-400">
+                    {metrics.freq >= 1000
+                      ? `${(metrics.freq / 1000).toFixed(2)} kHz`
+                      : `${metrics.freq.toFixed(1)} Hz`}
                   </span>
+                ) : (
+                  <span className="text-[10px] font-mono text-slate-500">--</span>
                 )}
               </div>
+
               <select
-                className="bg-gray-900 border border-gray-600 text-[11px] text-gray-200 rounded px-1.5 py-1 w-full outline-none focus:border-cyan-500 truncate"
+                className="bg-slate-900 border border-slate-700 text-[11px] text-slate-200 rounded-lg px-2 py-1 w-full outline-none focus:border-cyan-500 truncate font-mono"
                 value={assignedNode === null ? 'OFF' : assignedNode.toString()}
                 onChange={(e) => handleChannelChange(i, e.target.value)}
               >
                 <option value="OFF">-- Desactivado --</option>
-                {allNodes.map(n => (
+                {allNodes.map((n) => (
                   <option key={n} value={n}>
                     {waveformData.nodeLabels[n] ?? `Nodo ${n}`}
                   </option>
@@ -352,15 +509,15 @@ const Oscilloscope: React.FC = () => {
 
               {/* Real-time Measurements */}
               {metrics ? (
-                <div className="grid grid-cols-2 gap-x-1 text-[10px] font-mono text-gray-400 pt-1 border-t border-gray-800">
-                  <div>Vpp: <span className="text-gray-200 font-semibold">{formatVoltage(metrics.vpp)}</span></div>
-                  <div>Vmax: <span className="text-gray-200 font-semibold">{formatVoltage(metrics.max)}</span></div>
-                  <div>Vmin: <span className="text-gray-200 font-semibold">{formatVoltage(metrics.min)}</span></div>
-                  <div>f: <span className="text-gray-200 font-semibold">{metrics.freq > 0 ? `${metrics.freq.toFixed(0)}Hz` : '--'}</span></div>
+                <div className="grid grid-cols-2 gap-x-1 gap-y-0.5 text-[10px] font-mono text-slate-400 pt-1 border-t border-slate-800/80">
+                  <div>Vpp: <span className="text-slate-100 font-semibold">{formatVoltage(metrics.vpp)}</span></div>
+                  <div>Vrms: <span className="text-slate-100 font-semibold">{formatVoltage(metrics.vrms)}</span></div>
+                  <div>Vmax: <span className="text-slate-100 font-semibold">{formatVoltage(metrics.max)}</span></div>
+                  <div>Vmin: <span className="text-slate-100 font-semibold">{formatVoltage(metrics.min)}</span></div>
                 </div>
               ) : (
-                <div className="text-[10px] font-mono text-gray-500 italic pt-1 border-t border-gray-800">
-                  Sin señal conectada
+                <div className="text-[10px] font-mono text-slate-500 italic pt-1 border-t border-slate-800/80">
+                  Canal apagado
                 </div>
               )}
             </div>

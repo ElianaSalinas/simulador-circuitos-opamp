@@ -128,31 +128,35 @@ export const predefinedCircuits = [
     name: '03 - Oscilador Puente de Wien (Onda Senoidal)',
     data: {
       components: [
-        { id: 'op1', type: 'OpAmp', x: 500, y: 300, rotation: 0, label: 'U1' },
-        { id: 'r1', type: 'Resistor', x: 300, y: 200, rotation: 0, value: 10000, label: 'R1' },
-        { id: 'c1', type: 'Capacitor', x: 400, y: 200, rotation: 0, value: 1e-7, label: 'C1' },
-        { id: 'r2', type: 'Resistor', x: 200, y: 300, rotation: 90, value: 10000, label: 'R2' },
-        { id: 'c2', type: 'Capacitor', x: 200, y: 400, rotation: 90, value: 1e-7, label: 'C2' },
+        { id: 'op1', type: 'OpAmp', x: 520, y: 300, rotation: 0, label: 'U1' },
+        { id: 'r1', type: 'Resistor', x: 360, y: 180, rotation: 0, value: 10000, label: 'R1' },
+        { id: 'c1', type: 'Capacitor', x: 480, y: 180, rotation: 0, value: 1e-7, label: 'C1' },
+        { id: 'r2', type: 'Resistor', x: 220, y: 320, rotation: 90, value: 10000, label: 'R2' },
+        { id: 'c2', type: 'Capacitor', x: 320, y: 320, rotation: 90, value: 1e-7, label: 'C2' },
         
-        { id: 'r3', type: 'Resistor', x: 500, y: 450, rotation: 0, value: 21000, label: 'Rf' },
-        { id: 'r4', type: 'Resistor', x: 350, y: 450, rotation: 90, value: 10000, label: 'Ri' },
+        { id: 'r3', type: 'Resistor', x: 520, y: 450, rotation: 0, value: 21000, label: 'Rf' },
+        { id: 'r4', type: 'Resistor', x: 380, y: 450, rotation: 90, value: 10000, label: 'Ri' },
         
-        { id: 'gnd', type: 'Ground', x: 200, y: 550, rotation: 0, label: 'GND1' }
+        { id: 'gnd', type: 'Ground', x: 270, y: 440, rotation: 0, label: 'GND1' },
+        { id: 'gnd_neg', type: 'Ground', x: 380, y: 550, rotation: 0, label: 'GND2' }
       ],
       connections: [
-        // Positive feedback (Wien network)
+        // Positive feedback series arm (OpAmp out -> C1 -> R1 -> OpAmp in+)
         { id: 'cw1', fromComponentId: 'op1', fromPinId: 'out', toComponentId: 'c1', toPinId: 'right' },
         { id: 'cw2', fromComponentId: 'c1', fromPinId: 'left', toComponentId: 'r1', toPinId: 'right' },
         { id: 'cw3', fromComponentId: 'r1', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in+' },
+
+        // Positive feedback parallel arm (R2 || C2 to GND from OpAmp in+)
         { id: 'cw4', fromComponentId: 'r2', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in+' },
-        { id: 'cw5', fromComponentId: 'r2', fromPinId: 'right', toComponentId: 'c2', toPinId: 'left' },
-        { id: 'cw6', fromComponentId: 'c2', fromPinId: 'right', toComponentId: 'gnd', toPinId: 'gnd' },
+        { id: 'cw5', fromComponentId: 'r2', fromPinId: 'right', toComponentId: 'gnd', toPinId: 'gnd' },
+        { id: 'cw6', fromComponentId: 'c2', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in+' },
+        { id: 'cw7', fromComponentId: 'c2', fromPinId: 'right', toComponentId: 'gnd', toPinId: 'gnd' },
         
-        // Negative feedback (Gain > 3 for oscillation)
+        // Negative feedback (Gain A = 1 + Rf/Ri = 3.1 > 3 for Barkhausen oscillation)
         { id: 'cn1', fromComponentId: 'op1', fromPinId: 'out', toComponentId: 'r3', toPinId: 'right' },
         { id: 'cn2', fromComponentId: 'r3', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in-' },
         { id: 'cn3', fromComponentId: 'r4', fromPinId: 'left', toComponentId: 'op1', toPinId: 'in-' },
-        { id: 'cn4', fromComponentId: 'r4', fromPinId: 'right', toComponentId: 'gnd', toPinId: 'gnd' }
+        { id: 'cn4', fromComponentId: 'r4', fromPinId: 'right', toComponentId: 'gnd_neg', toPinId: 'gnd' }
       ]
     }
   },

@@ -4,9 +4,9 @@ import type { RootState } from '../store';
 import { updateComponentProps, removeComponent, selectComponent } from '../store/circuitSlice';
 
 const UNIT_STEPS: Record<string, string[]> = {
-  Ω: ['Ω', 'kΩ', 'MΩ'],
-  F: ['pF', 'nF', 'µF'],
-  V: ['mV', 'V'],
+  'Ω': ['Ω', 'kΩ', 'MΩ'],
+  'F': ['pF', 'nF', 'µF'],
+  'V': ['mV', 'V'],
 };
 
 const toBaseValue = (val: number, unit: string): number => {
@@ -33,10 +33,10 @@ const PropertyPanel: React.FC = () => {
   const dispatch = useDispatch();
   const selectedId = useSelector((state: RootState) => state.circuit.selectedComponentId);
   const component = useSelector((state: RootState) =>
-    state.circuit.components.find(c => c.id === selectedId)
+    state.circuit.components.find((c) => c.id === selectedId)
   );
   const errors = useSelector((state: RootState) =>
-    state.circuit.validationErrors.filter(e => e.componentId === selectedId)
+    state.circuit.validationErrors.filter((e) => e.componentId === selectedId)
   );
 
   const [displayUnit, setDisplayUnit] = useState('');
@@ -54,7 +54,6 @@ const PropertyPanel: React.FC = () => {
 
     if (component.value !== undefined && unitSteps) {
       const base = component.value;
-      // Pick best display unit
       let best = unitSteps[0];
       for (const u of unitSteps) {
         if (fromBaseValue(base, u) >= 0.1) best = u;
@@ -65,9 +64,9 @@ const PropertyPanel: React.FC = () => {
       setDisplayUnit(baseUnit);
       setDisplayValue('');
     }
-    
+
     setLabelEdit(component.label);
-    
+
     if (component.type === 'Voltage') {
       setWaveform(component.waveform || 'dc');
       setFrequency(component.frequency?.toString() || '1000');
@@ -78,36 +77,39 @@ const PropertyPanel: React.FC = () => {
 
   if (!component) {
     return (
-      <div className="w-[220px] bg-white border-l border-gray-200 flex flex-col h-full shadow-sm">
-        <div className="p-4 border-b border-gray-100">
-          <h2 className="text-sm font-bold text-gray-800 uppercase tracking-widest">Propiedades</h2>
+      <div className="w-[230px] bg-slate-900/95 backdrop-blur-md border-l border-slate-800 flex flex-col h-full select-none shadow-2xl">
+        <div className="p-3.5 border-b border-slate-800 flex items-center justify-between">
+          <h2 className="text-xs font-bold text-slate-300 uppercase tracking-widest font-mono">
+            Inspector
+          </h2>
         </div>
-        <div className="flex-1 flex items-center justify-center p-4 text-center">
-          <p className="text-xs text-gray-400">Selecciona un componente en el lienzo</p>
+        <div className="flex-1 flex flex-col items-center justify-center p-4 text-center text-slate-500">
+          <span className="text-2xl mb-2">⚡</span>
+          <p className="text-xs font-mono">Selecciona un componente para editar sus propiedades</p>
         </div>
       </div>
     );
   }
 
   const baseUnit = component.unit;
-  const unitOptions = baseUnit ? (UNIT_STEPS[baseUnit] ?? [baseUnit]) : [];
+  const unitOptions = baseUnit ? UNIT_STEPS[baseUnit] ?? [baseUnit] : [];
   const hasValue = component.value !== undefined && baseUnit;
 
   const handleSave = () => {
     const updates: any = { label: labelEdit };
-    
+
     if (hasValue && displayValue) {
       updates.value = toBaseValue(parseFloat(displayValue), displayUnit);
     }
-    
+
     if (component.type === 'Voltage') {
       updates.waveform = waveform;
       updates.frequency = parseFloat(frequency) || 1000;
       updates.amplitude = parseFloat(amplitude) || 5;
       updates.offset = parseFloat(offset) || 0;
-      if (waveform !== 'dc') updates.value = updates.offset; // Para compatibilidad DC solver
+      if (waveform !== 'dc') updates.value = updates.offset;
     }
-    
+
     dispatch(updateComponentProps({ id: component.id, updates }));
   };
 
@@ -117,52 +119,63 @@ const PropertyPanel: React.FC = () => {
   };
 
   return (
-    <div className="w-[240px] bg-white border-l border-gray-200 flex flex-col h-full shadow-sm">
+    <div className="w-[240px] bg-slate-900/95 backdrop-blur-md border-l border-slate-800 flex flex-col h-full select-none shadow-2xl">
       {/* Header */}
-      <div className="p-4 border-b border-gray-100 flex items-center justify-between">
-        <h2 className="text-sm font-bold text-gray-800 uppercase tracking-widest">Propiedades</h2>
+      <div className="p-3.5 border-b border-slate-800 flex items-center justify-between">
+        <h2 className="text-xs font-bold text-slate-200 uppercase tracking-widest font-mono flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-cyan-400"></span>
+          Propiedades
+        </h2>
+        <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded bg-slate-800 text-cyan-400 border border-slate-700">
+          {component.label}
+        </span>
       </div>
 
       {/* Content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {/* Type badge */}
+      <div className="flex-1 overflow-y-auto p-3.5 space-y-3.5">
+        {/* Type */}
         <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Tipo</label>
-          <div className="mt-1 px-3 py-2 bg-gray-50 border border-gray-100 rounded-md text-sm font-medium text-gray-700">
-            {component.type}
+          <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Tipo</label>
+          <div className="mt-1 px-3 py-1.5 bg-slate-950/70 border border-slate-800 rounded-lg text-xs font-mono font-semibold text-slate-300">
+            {component.type === 'OpAmp' ? 'Amplificador Operacional' : component.type}
           </div>
         </div>
 
         {/* Label */}
         <div>
-          <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Designador</label>
+          <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Designador</label>
           <input
-            className="mt-1 w-full px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+            className="mt-1 w-full px-3 py-1.5 text-xs font-mono bg-slate-950/80 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500 transition-colors"
             value={labelEdit}
-            onChange={e => setLabelEdit(e.target.value)}
+            onChange={(e) => setLabelEdit(e.target.value)}
             onBlur={handleSave}
           />
         </div>
 
-        {/* Base Value (Resistance, Capacitance, or DC Voltage) */}
+        {/* Base Value */}
         {hasValue && component.type !== 'Voltage' && (
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">Valor</label>
-            <div className="mt-1 flex gap-1">
+            <label className="text-[11px] font-mono text-slate-400 uppercase tracking-wider">Valor Nominal</label>
+            <div className="mt-1 flex gap-1.5">
               <input
                 type="number"
-                className="flex-1 min-w-0 px-3 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                step="any"
+                className="flex-1 min-w-0 px-3 py-1.5 text-xs font-mono bg-slate-950/80 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500 transition-colors"
                 value={displayValue}
-                onChange={e => setDisplayValue(e.target.value)}
+                onChange={(e) => setDisplayValue(e.target.value)}
                 onBlur={handleSave}
               />
               <select
-                className="px-2 py-2 text-sm border border-gray-200 rounded-md focus:outline-none focus:border-blue-500 bg-white"
+                className="px-2 py-1.5 text-xs font-mono bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:border-cyan-500"
                 value={displayUnit}
-                onChange={e => { setDisplayUnit(e.target.value); }}
+                onChange={(e) => setDisplayUnit(e.target.value)}
                 onBlur={handleSave}
               >
-                {unitOptions.map(u => <option key={u} value={u}>{u}</option>)}
+                {unitOptions.map((u) => (
+                  <option key={u} value={u}>
+                    {u}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
@@ -170,63 +183,67 @@ const PropertyPanel: React.FC = () => {
 
         {/* Voltage Source AC Config */}
         {component.type === 'Voltage' && (
-          <div className="space-y-3 p-3 bg-blue-50/50 rounded-lg border border-blue-100">
+          <div className="space-y-3 p-3 bg-slate-950/70 rounded-xl border border-slate-800">
             <div>
-              <label className="text-xs font-semibold text-gray-600 uppercase">Modo de Fuente</label>
+              <label className="text-[11px] font-mono text-slate-400 uppercase">Forma de Onda</label>
               <select
-                className="mt-1 w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-500 bg-white"
+                className="mt-1 w-full px-2 py-1.5 text-xs font-mono bg-slate-800 border border-slate-700 rounded-lg text-slate-200 focus:outline-none focus:border-cyan-500"
                 value={waveform}
-                onChange={e => { setWaveform(e.target.value as any); }}
+                onChange={(e) => setWaveform(e.target.value as any)}
                 onBlur={handleSave}
               >
                 <option value="dc">Voltaje Directo (DC)</option>
-                <option value="sine">Onda Senoidal</option>
-                <option value="square">Onda Cuadrada</option>
-                <option value="triangle">Onda Triangular</option>
+                <option value="sine">Onda Senoidal (~)</option>
+                <option value="square">Onda Cuadrada (⎍)</option>
+                <option value="triangle">Onda Triangular (∧)</option>
               </select>
             </div>
 
             {waveform === 'dc' ? (
               <div>
-                <label className="text-xs font-semibold text-gray-600 uppercase">Voltaje (V)</label>
+                <label className="text-[11px] font-mono text-slate-400 uppercase">Voltaje DC (V)</label>
                 <input
                   type="number"
-                  className="mt-1 w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-500"
+                  step="any"
+                  className="mt-1 w-full px-3 py-1.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500"
                   value={offset}
-                  onChange={e => setOffset(e.target.value)}
+                  onChange={(e) => setOffset(e.target.value)}
                   onBlur={handleSave}
                 />
               </div>
             ) : (
               <div className="space-y-2">
                 <div>
-                  <label className="text-xs font-semibold text-gray-600 uppercase">Frecuencia (Hz)</label>
+                  <label className="text-[11px] font-mono text-slate-400 uppercase">Frecuencia (Hz)</label>
                   <input
                     type="number"
-                    className="mt-1 w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-500"
+                    step="any"
+                    className="mt-1 w-full px-3 py-1.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500"
                     value={frequency}
-                    onChange={e => setFrequency(e.target.value)}
+                    onChange={(e) => setFrequency(e.target.value)}
                     onBlur={handleSave}
                   />
                 </div>
                 <div className="flex gap-2">
                   <div className="flex-1">
-                    <label className="text-xs font-semibold text-gray-600 uppercase">Amplitud (Vp)</label>
+                    <label className="text-[10px] font-mono text-slate-400 uppercase">Amplitud (Vp)</label>
                     <input
                       type="number"
-                      className="mt-1 w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-500"
+                      step="any"
+                      className="mt-1 w-full px-2 py-1.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500"
                       value={amplitude}
-                      onChange={e => setAmplitude(e.target.value)}
+                      onChange={(e) => setAmplitude(e.target.value)}
                       onBlur={handleSave}
                     />
                   </div>
                   <div className="flex-1">
-                    <label className="text-xs font-semibold text-gray-600 uppercase">Offset (V)</label>
+                    <label className="text-[10px] font-mono text-slate-400 uppercase">Offset (V)</label>
                     <input
                       type="number"
-                      className="mt-1 w-full px-2 py-1.5 text-sm border border-gray-200 rounded focus:outline-none focus:border-blue-500"
+                      step="any"
+                      className="mt-1 w-full px-2 py-1.5 text-xs font-mono bg-slate-900 border border-slate-700 rounded-lg text-slate-100 focus:outline-none focus:border-cyan-500"
                       value={offset}
-                      onChange={e => setOffset(e.target.value)}
+                      onChange={(e) => setOffset(e.target.value)}
                       onBlur={handleSave}
                     />
                   </div>
@@ -238,26 +255,28 @@ const PropertyPanel: React.FC = () => {
 
         {/* Validation errors */}
         {errors.length > 0 && (
-          <div className="rounded-md bg-red-50 border border-red-200 p-3">
-            <p className="text-xs font-semibold text-red-600 mb-1">⚠ Errores</p>
+          <div className="rounded-xl bg-rose-950/40 border border-rose-800/60 p-3">
+            <p className="text-xs font-mono font-semibold text-rose-400 mb-1">⚠ Advertencias</p>
             {errors.map((e, i) => (
-              <p key={i} className="text-xs text-red-500 leading-tight">{e.message}</p>
+              <p key={i} className="text-[11px] font-mono text-rose-300 leading-tight">
+                {e.message}
+              </p>
             ))}
           </div>
         )}
       </div>
 
       {/* Footer actions */}
-      <div className="p-4 border-t border-gray-100 space-y-2">
+      <div className="p-3.5 border-t border-slate-800 space-y-2">
         <button
           onClick={handleSave}
-          className="w-full py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors shadow-sm"
+          className="w-full py-2 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold rounded-xl transition-colors shadow-lg shadow-cyan-900/30"
         >
           Aplicar Cambios
         </button>
         <button
           onClick={handleDelete}
-          className="w-full py-2 bg-white text-red-600 text-sm font-medium rounded-md hover:bg-red-50 transition-colors border border-red-200"
+          className="w-full py-1.5 bg-rose-950/40 hover:bg-rose-900/60 text-rose-300 text-xs font-mono font-semibold rounded-xl transition-colors border border-rose-800/50"
         >
           Eliminar Componente
         </button>
@@ -267,4 +286,3 @@ const PropertyPanel: React.FC = () => {
 };
 
 export default PropertyPanel;
-
